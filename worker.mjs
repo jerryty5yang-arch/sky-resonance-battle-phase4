@@ -1,8 +1,93 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+// ../dist/missions.js
+var MISSIONS = Object.freeze({ sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
+var validMission = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(MISSIONS, id), "validMission");
+var missionRules = /* @__PURE__ */ __name((id) => MISSIONS[validMission(id) ? id : "sky"], "missionRules");
+
+// ../dist/aircraft.js
+var AIRCRAFT = Object.freeze({
+  balanced: Object.freeze({ id: "balanced", name: "\u84BC\u7FFC", pilot: "\u98AF", role: "\u5747\u8861\u578B", speed: 280, interval: 0.12, damage: 5, offsets: [-10, 10], angles: [0, 0], portrait: "pilot-hayate.jpg", description: "\u96D9\u767C\u76F4\u5C04\uFF0C\u653B\u5B88\u517C\u5099\u3002\u719F\u6089\u7684\u6230\u6A5F\uFF0C\u7A69\u5B9A\u638C\u63E1\u6BCF\u4E00\u6B21\u9583\u907F\u3002" }),
+  swift: Object.freeze({ id: "swift", name: "\u75BE\u98A8", pilot: "\u9F4A\u65AF", role: "\u9AD8\u6A5F\u52D5\u578B", speed: 336, interval: 0.1, damage: 4, offsets: [-4, 4], angles: [0, 0], portrait: "pilot-keith.jpg", description: "\u79FB\u901F\u63D0\u5347 20%\uFF0C\u96C6\u4E2D\u96D9\u767C\u5C04\u64CA\u3002\u4EE5\u9748\u6D3B\u8D70\u4F4D\u7A7F\u8D8A\u5BC6\u96C6\u5F48\u5E55\u3002" }),
+  heavy: Object.freeze({ id: "heavy", name: "\u91CD\u7832", pilot: "\u6885\u745F", role: "\u706B\u529B\u578B", speed: 238, interval: 0.18, damage: 6, offsets: [-12, 0, 12], angles: [-0.18, 0, 0.18], portrait: "pilot-messer.jpg", description: "\u79FB\u901F\u964D\u4F4E 15%\uFF0C\u4E09\u767C\u6247\u5F62\u5C04\u64CA\u3002\u64F4\u5927\u706B\u529B\u8986\u84CB\uFF0C\u6514\u622A\u6575\u7FA4\u3002" })
+});
+var validAircraft = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(AIRCRAFT, id), "validAircraft");
+var aircraftRules = /* @__PURE__ */ __name((id) => AIRCRAFT[validAircraft(id) ? id : "balanced"], "aircraftRules");
+function aircraftShots(id, x, y) {
+  const r = aircraftRules(id);
+  return r.angles.map((a, i) => ({ x: x + r.offsets[i], y: y - 28, vx: Math.sin(a) * 650, vy: -Math.cos(a) * 650, r: 3, damage: r.damage }));
+}
+__name(aircraftShots, "aircraftShots");
+
 // src/worker.mjs
 import { DurableObject } from "cloudflare:workers";
+
+// ../dist/weapons.js
+var WEAPONS = { balanced: { name: "\u591A\u91CD\u9396\u5B9A", cooldown: 8, description: "8 \u679A\u8FFD\u8E64\u98DB\u5F48 \xB7 \u51B7\u537B 8 \u79D2" }, swift: { name: "\u75BE\u98A8\u7A81\u9032", cooldown: 6, description: "\u6CBF\u79FB\u52D5\u65B9\u5411\u7A81\u9032 \xB7 \u7121\u6575 0.35 \u79D2 \xB7 \u51B7\u537B 6 \u79D2" }, heavy: { name: "\u8CAB\u7A7F\u91CD\u7832", cooldown: 10, description: "\u84C4\u529B 1.2 \u79D2\u5F8C\u767C\u5C04\u8CAB\u7A7F\u5149\u675F \xB7 \u51B7\u537B 10 \u79D2" } };
+var weaponRules = /* @__PURE__ */ __name((id) => WEAPONS[Object.hasOwn(WEAPONS, id) ? id : "balanced"], "weaponRules");
+function startWeapon(actor, pos, aircraft, input, launch) {
+  if (actor.hp <= 0 || actor.missileCd > 0) return false;
+  actor.missileCd = weaponRules(aircraft).cooldown;
+  if (aircraft === "swift") {
+    let dx = input?.x || 0, dy = input?.y || 0;
+    if (!dx && !dy && input?.target) {
+      dx = input.target.x - pos.x;
+      dy = input.target.y - pos.y;
+    }
+    const length = Math.hypot(dx, dy);
+    if (length > 0.01) {
+      dx /= length;
+      dy /= length;
+    } else {
+      dx = 0;
+      dy = -1;
+    }
+    actor.skill = { kind: "dash", remaining: 0.35, dx, dy, x0: pos.x, y0: pos.y, x1: pos.x, y1: pos.y };
+    actor.skillHits = /* @__PURE__ */ new WeakSet();
+    actor.invuln = Math.max(actor.invuln, 0.35);
+  } else if (aircraft === "heavy") actor.skill = { kind: "charge", remaining: 1.2 };
+  else launch();
+  return true;
+}
+__name(startWeapon, "startWeapon");
+function stepWeapon(actor, pos, dt, targets, damage) {
+  const skill = actor.skill;
+  if (!skill) return false;
+  if (actor.hp <= 0) {
+    actor.skill = null;
+    return false;
+  }
+  if (skill.kind === "dash") {
+    const used = Math.min(dt, skill.remaining), x = pos.x, y = pos.y;
+    pos.x = Math.max(28, Math.min(452, x + skill.dx * 600 * used));
+    pos.y = Math.max(175, Math.min(655, y + skill.dy * 600 * used));
+    skill.x1 = pos.x;
+    skill.y1 = pos.y;
+    const dx = pos.x - x, dy = pos.y - y, len = dx * dx + dy * dy;
+    actor.skillHits ??= /* @__PURE__ */ new WeakSet();
+    for (const e of targets) {
+      const t = len ? Math.max(0, Math.min(1, ((e.x - x) * dx + (e.y - y) * dy) / len)) : 0;
+      if (e.hp > 0 && !actor.skillHits.has(e) && Math.hypot(e.x - x - dx * t, e.y - y - dy * t) < e.r + 18) {
+        actor.skillHits.add(e);
+        damage(e, 60);
+      }
+    }
+    skill.remaining = Math.max(0, skill.remaining - dt);
+    if (skill.remaining === 0) {
+      skill.kind = "trail";
+      skill.remaining = 0.18;
+    }
+    return true;
+  }
+  skill.remaining = Math.max(0, skill.remaining - dt);
+  if (skill.kind === "charge" && skill.remaining < 1e-8) {
+    actor.skill = { kind: "beam", remaining: 0.32, x0: pos.x, y0: pos.y - 24, x1: pos.x, y1: Math.max(-100, pos.y - 674) };
+    for (const e of targets) if (e.hp > 0 && e.y <= pos.y - 24 + e.r && e.y >= pos.y - 674 - e.r && Math.abs(e.x - pos.x) <= 22 + e.r) damage(e, 150);
+  } else if (skill.remaining === 0) actor.skill = null;
+  return false;
+}
+__name(stepWeapon, "stepWeapon");
 
 // src/combat.mjs
 var clamp = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
@@ -11,6 +96,7 @@ var CoopCombat = class {
     __name(this, "CoopCombat");
   }
   constructor(players, random = Math.random) {
+    this.mission = missionRules(players[0]?.mission).id;
     this.random = random;
     this.time = 0;
     this.tick = 0;
@@ -30,7 +116,7 @@ var CoopCombat = class {
     this.missiles = [];
     this.events = [];
     this.eventId = 0;
-    this.players = players.map((p, i) => ({ id: p.id, name: p.name, slot: i, x: 180 + i * 120, y: 620, hp: 100, energy: 25, score: 0, kills: 0, fire: 0, invuln: 2, missileCd: 0, input: { x: 0, y: 0 }, lastInput: -Infinity, seq: -1, connected: true }));
+    this.players = players.map((p, i) => ({ id: p.id, name: p.name, aircraft: aircraftRules(p.aircraft).id, slot: i, x: 180 + i * 120, y: 620, hp: 100, energy: 25, score: 0, kills: 0, fire: 0, invuln: 2, missileCd: 0, input: { x: 0, y: 0 }, lastInput: -Infinity, seq: -1, connected: true }));
   }
   event(type, data = {}) {
     this.events.push({ id: ++this.eventId, type, ...data });
@@ -45,11 +131,7 @@ var CoopCombat = class {
     p.lastInput = now;
     p.input = { x: data.x, y: data.y, target: data.target ? { x: clamp(data.target.x, 28, 452), y: clamp(data.target.y, 175, 655) } : null };
     if (this.state === "playing" && this.intro <= 0) {
-      if (data.missile === true && p.missileCd <= 0) {
-        p.missileCd = 8;
-        this.launch(p, 8);
-        this.event("missile", { slot });
-      }
+      if (data.missile === true && startWeapon(p, p, p.aircraft, p.input, () => this.launch(p, 8))) this.event("missile", { slot });
       if (data.support === true && p.energy >= 100 && this.res <= 0 && this.burst <= 0) {
         p.energy = 0;
         this.intro = 2.4;
@@ -60,7 +142,8 @@ var CoopCombat = class {
     return true;
   }
   launch(p, n) {
-    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: 4.5, age: 0, damage: n > 8 ? 40 : 22, super: n > 8 });
+    const targets = [...this.enemies.filter((e) => e.hp > 0), ...this.boss?.hp > 0 ? [this.boss] : []];
+    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, targetId: n === 8 && targets.length ? targets[i % targets.length].id : null, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: 4.5, age: 0, damage: n > 8 ? 40 : 22, super: n > 8 });
   }
   damage(e, amount, owner) {
     if (e.hp <= 0 || this.state !== "playing") return;
@@ -78,6 +161,7 @@ var CoopCombat = class {
   hit(p) {
     if (p.hp <= 0 || p.invuln > 0) return;
     p.hp = Math.max(0, p.hp - 20);
+    if (p.hp === 0) p.skill = null;
     p.invuln = 1.5;
     this.event("hit", { slot: p.slot });
     if (this.players.every((p2) => p2.hp <= 0)) this.finish(false);
@@ -106,7 +190,7 @@ var CoopCombat = class {
       return;
     }
     this.phase = this.time < 65 ? 0 : this.time < 130 ? 1 : 2;
-    const resStep = Math.min(dt, this.res), movement = 280 * (dt + resStep * 0.5), bulletStep = dt - resStep * 0.6;
+    const resStep = Math.min(dt, this.res), movementTime = dt + resStep * 0.5, bulletStep = dt - resStep * 0.6;
     this.burst = Math.max(0, this.burst - dt);
     if (this.res > 0) {
       this.res = Math.max(0, this.res - dt);
@@ -120,6 +204,9 @@ var CoopCombat = class {
       p.invuln = Math.max(0, p.invuln - dt);
       p.missileCd = Math.max(0, p.missileCd - dt);
       if (p.hp <= 0 || !p.connected) continue;
+      const dashing = stepWeapon(p, p, dt, [...this.enemies, ...this.boss ? [this.boss] : []], (e, n) => this.damage(e, n, p.slot));
+      if (this.state !== "playing") return;
+      const movement = dashing ? 0 : aircraftRules(p.aircraft).speed * movementTime;
       const input = now - p.lastInput <= 250 ? p.input : { x: 0, y: 0 };
       let dx = input.x, dy = input.y;
       if (!dx && !dy && input.target) {
@@ -142,8 +229,8 @@ var CoopCombat = class {
       p.y = clamp(p.y, 175, 655);
       p.fire -= dt;
       if (p.fire <= 0) {
-        p.fire = 0.12;
-        for (const side of [-1, 1]) this.shots.push({ id: this.nextId++, owner: p.slot, x: p.x + side * 10, y: p.y - 28, vx: 0, vy: -650, r: 3, damage: 5 });
+        p.fire += aircraftRules(p.aircraft).interval;
+        for (const shot of aircraftShots(p.aircraft, p.x, p.y)) this.shots.push({ id: this.nextId++, owner: p.slot, ...shot });
       }
     }
     this.spawn -= dt;
@@ -193,6 +280,7 @@ var CoopCombat = class {
     }
     const targets = [...this.enemies, ...b ? [b] : []];
     for (const s of this.shots) {
+      s.x += s.vx * dt;
       s.y += s.vy * dt;
       for (const e of targets) if (e.hp > 0 && Math.hypot(s.x - e.x, s.y - e.y) < e.r + s.r) {
         this.damage(e, s.damage, s.owner);
@@ -203,7 +291,8 @@ var CoopCombat = class {
     for (const m of this.missiles) {
       m.life -= dt;
       m.age += dt;
-      const e = targets.find((e2) => e2.hp > 0);
+      const e = targets.find((e2) => e2.id === m.targetId && e2.hp > 0) || targets.find((e2) => e2.hp > 0);
+      if (e) m.targetId = e.id;
       if (m.age > 0.18) {
         const a = e ? Math.atan2(e.y - m.y, e.x - m.x) : -Math.PI / 2, v = m.super ? 530 : 430;
         m.vx += (Math.cos(a) * v - m.vx) * Math.min(1, dt * 5);
@@ -225,13 +314,13 @@ var CoopCombat = class {
         break;
       }
     }
-    this.shots = this.shots.filter((s) => s.y > -70);
+    this.shots = this.shots.filter((s) => s.y > -70 && s.x > -20 && s.x < 500);
     this.missiles = this.missiles.filter((m) => m.life > 0 && m.y > -80 && m.y < 950);
     this.bullets = this.bullets.filter((s) => s.y < 830 && s.y > -60 && s.x > -30 && s.x < 510);
     this.enemies = this.enemies.filter((e) => e.hp > 0 && e.y < 870);
   }
   snapshot() {
-    return { tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, ...p }) => ({ ...p })), enemies: this.enemies.map((e) => ({ ...e })), boss: this.boss ? { ...this.boss } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map((e) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
+    return { mission: this.mission, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e })), boss: this.boss ? { ...this.boss } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map((e) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
   }
 };
 
@@ -379,10 +468,10 @@ __name(verifyRoom, "verifyRoom");
 
 // src/worker.mjs
 var response = /* @__PURE__ */ __name((body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } }), "response");
-var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && players.length === 2 && players.every((p) => typeof p.id === "string" && p.id.length < 100 && typeof p.name === "string" && p.name.length <= 160) && players[0].id !== players[1].id, "rosterValid");
+var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && players.length === 2 && players.every((p) => (p.mission === void 0 || validMission(p.mission)) && (p.aircraft === void 0 || validAircraft(p.aircraft)) && typeof p.id === "string" && p.id.length < 100 && typeof p.name === "string" && p.name.length <= 160) && players[0].id !== players[1].id, "rosterValid");
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: 3, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: 8, specialWeapons: true, desertMission: true, aircraftSelection: true, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname === "/results" && request.method === "POST") {
     const raw = await request.text();
@@ -403,7 +492,7 @@ var worker_default = { async fetch(request, env) {
     const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId));
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
-    return response({ matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
+    return response({ specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
   }
   if (url.pathname.startsWith("/room/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -561,7 +650,7 @@ var BattleService = class extends DurableObject {
       }
       if (this.room.result && !this.saved && !this.writing) {
         this.writing = true;
-        this.ctx.waitUntil(this.ctx.storage.put("match", { id: this.room.id, players: this.room.game.players.map((p) => ({ id: p.id, name: p.name })), created: this.created, result: this.room.result }).then(() => {
+        this.ctx.waitUntil(this.ctx.storage.put("match", { id: this.room.id, players: this.room.game.players.map((p) => ({ id: p.id, name: p.name, aircraft: p.aircraft, mission: this.room.game.mission })), created: this.created, result: this.room.result }).then(() => {
           this.saved = true;
         }).finally(() => {
           this.writing = false;
