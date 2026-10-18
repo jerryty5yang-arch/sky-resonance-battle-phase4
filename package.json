@@ -1,1 +1,11 @@
-{"name": "sky-resonance-battle-phase4", "private": true, "type": "module", "devDependencies": {"wrangler": "4.45.0"}}
+{
+  "name": "sky-resonance-battle-phase4",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.45.0"
+  }
+}
