@@ -4,6 +4,7 @@
   "compatibility_date": "2025-09-01",
   "workers_dev": true,
   "vars": {
+    "ROOM_LOCATION_HINT": "apac-ne",
     "SITE_ORIGIN": "https://sky-resonance-phase4-20261016.divinelamp256.chatgpt.site",
     "SITE_PUBLIC_KEY": "{\"key_ops\":[\"verify\"],\"ext\":true,\"kty\":\"EC\",\"x\":\"UJOWdpGXbQPTUI5ee21Gn0NrDLzJ85EMEoLnYL-wbuY\",\"y\":\"BW_jmW2UJ1j1oY_z7UV2leeg6qFX2knBVGo6JLFYOXU\",\"crv\":\"P-256\"}"
   },

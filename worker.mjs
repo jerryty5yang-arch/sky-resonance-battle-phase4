@@ -1,6 +1,52 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+// src/diagnostics.mjs
+var BACKEND_VERSION = 20;
+var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
+var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
+function edgeDiagnostic(request, env) {
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== env.SITE_ORIGIN) return new Response("Origin denied", { status: 403 });
+  return Response.json({ version: BACKEND_VERSION, entryColo: request.cf?.colo || null, roomLocationHint: roomLocationHint(env) }, { headers: { "Cache-Control": "no-store", "Access-Control-Allow-Origin": env.SITE_ORIGIN, "Vary": "Origin" } });
+}
+__name(edgeDiagnostic, "edgeDiagnostic");
+async function roomEgress(fetcher = fetch) {
+  try {
+    const r = await fetcher("https://www.cloudflare.com/cdn-cgi/trace", { signal: AbortSignal.timeout(2e3) });
+    if (!r.ok) return null;
+    return (await r.text()).match(/^colo=([A-Z]{3})\r?$/m)?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+__name(roomEgress, "roomEgress");
+var InputTiming = class {
+  static {
+    __name(this, "InputTiming");
+  }
+  constructor() {
+    this.pending = /* @__PURE__ */ new Map();
+    this.last = null;
+  }
+  received(seq, now) {
+    this.pending.set(seq, now);
+    while (this.pending.size > 60) this.pending.delete(this.pending.keys().next().value);
+  }
+  applied(seq, now) {
+    if (this.last?.seq === seq) return;
+    const received = this.pending.get(seq);
+    if (received === void 0) return;
+    this.last = { seq, received, applied: now };
+    for (const key of this.pending.keys()) if (key <= seq) this.pending.delete(key);
+  }
+  sample(now) {
+    if (!this.last) return null;
+    const p = this.last;
+    return { seq: p.seq, simulationWaitMs: Math.max(0, p.applied - p.received), snapshotWaitMs: Math.max(0, now - p.applied) };
+  }
+};
+
 // ../dist/missions.js
 var MISSIONS = Object.freeze({ survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
 var validMission = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(MISSIONS, id), "validMission");
@@ -226,7 +272,7 @@ var CoopCombat = class {
   launch(p, n) {
     const burstId = n > 8 ? this.supportDamage.begin() : null;
     const targets = [...this.enemies.filter((e) => e.hp > 0), ...this.boss?.hp > 0 ? [this.boss] : []];
-    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, targetId: n === 8 && targets.length ? targets[i % targets.length].id : null, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: 4.5, age: 0, damage: n > 8 ? 40 : 20, burstId, super: n > 8 });
+    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, targetId: n === 8 && targets.length ? targets[i % targets.length].id : null, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: n > 8 ? 4.5 : 3.5, age: 0, damage: n > 8 ? 40 : 20, burstId, super: n > 8 });
   }
   damage(e, amount, owner) {
     if (e.hp <= 0 || this.state !== "playing") return;
@@ -645,7 +691,8 @@ var response = /* @__PURE__ */ __name((body, status = 200) => Response.json(body
 var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && players.length === 2 && players.every((p) => (p.mission === void 0 || validMission(p.mission)) && (p.aircraft === void 0 || validAircraft(p.aircraft)) && typeof p.id === "string" && p.id.length < 100 && typeof p.name === "string" && p.name.length <= 160) && players[0].id !== players[1].id, "rosterValid");
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: 18, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: "apac", supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, transportDiagnostics: true, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname === "/results" && request.method === "POST") {
     const raw = await request.text();
@@ -663,7 +710,7 @@ var worker_default = { async fetch(request, env) {
     const gate = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName("__admission"));
     const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
     if (!admitted.ok) return admitted;
-    const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: "apac" });
+    const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: roomLocationHint(env) });
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
     return response({ survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
@@ -693,6 +740,8 @@ var BattleService = class extends DurableObject {
     this.created = 0;
     this.writing = false;
     this.saved = false;
+    this.inputTiming = [new InputTiming(), new InputTiming()];
+    this.egressProbe = null;
     ctx.blockConcurrencyWhile(async () => {
       const stored = await ctx.storage.get("match");
       if (stored) {
@@ -752,7 +801,7 @@ var BattleService = class extends DurableObject {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return response({ error: "WebSocket required" }, 426);
     const pair = new WebSocketPair(), client = pair[0], socket = pair[1];
     socket.accept();
-    let slot = null, authenticated = false, authenticating = false, count = 0, start = Date.now();
+    let slot = null, authenticated = false, authenticating = false, count = 0, start = Date.now(), lastDiagnostic = -Infinity;
     const timeout = setTimeout(() => socket.close(1008, "Authenticate first"), 5e3);
     socket.addEventListener("message", async (event) => {
       try {
@@ -775,7 +824,7 @@ var BattleService = class extends DurableObject {
           this.sockets.set(slot, socket);
           this.lastSeen.set(slot, Date.now());
           this.room.connect(slot, Date.now());
-          socket.send(JSON.stringify({ type: "welcome", slot, matchId: this.room.id }));
+          socket.send(JSON.stringify({ type: "welcome", slot, matchId: this.room.id, version: BACKEND_VERSION, entryColo: request.cf?.colo || null, roomLocationHint: roomLocationHint(this.env) }));
           socket.send(encodeSnapshot(this.room.snapshot(Date.now())));
           this.run();
           return;
@@ -785,7 +834,16 @@ var BattleService = class extends DurableObject {
           if (Number.isSafeInteger(msg.nonce)) socket.send(JSON.stringify({ type: "pong", nonce: msg.nonce }));
           return;
         }
-        this.room.message(slot, msg, Date.now());
+        if (msg.type === "diagnostics") {
+          if (Date.now() - lastDiagnostic < 3e4) return;
+          lastDiagnostic = Date.now();
+          this.egressProbe ??= roomEgress();
+          const roomEgressColo = await this.egressProbe;
+          socket.send(JSON.stringify({ type: "diagnostics", version: BACKEND_VERSION, entryColo: request.cf?.colo || null, roomEgressColo, roomLocationHint: roomLocationHint(this.env) }));
+          return;
+        }
+        const received = Date.now();
+        if (this.room.message(slot, msg, received) && msg.type === "input") this.inputTiming[slot].received(msg.seq, received);
       } catch {
         socket.close(1008, "Invalid message");
       }
@@ -816,8 +874,9 @@ var BattleService = class extends DurableObject {
         this.sockets.delete(slot);
       }
       this.room.advance(now);
+      this.room.game.players.forEach((p, i) => this.inputTiming[i].applied(p.ackSeq, now));
       if (this.snapshotSchedule.due(now, { phase: this.room.phase, world: this.room.game })) {
-        const data = encodeSnapshot(this.room.snapshot(now));
+        const data = encodeSnapshot({ ...this.room.snapshot(now), inputTiming: this.inputTiming.map((t) => t.sample(now)) });
         for (const socket of this.sockets.values()) try {
           if (socket.bufferedAmount > 262144) {
             socket.close(1013, "Slow connection");
