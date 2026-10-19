@@ -1,8 +1,45 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+// src/admission.mjs
+var ADMISSION_LIMITS = Object.freeze({ daily: 100, concurrent: 3 });
+var DAY = 864e5;
+function currentQuota(stored, now) {
+  const day = new Date(now).toISOString().slice(0, 10);
+  const quota = { day, count: stored?.day === day ? stored.count : 0, active: Object.assign(/* @__PURE__ */ Object.create(null), stored?.active), closed: Object.assign(/* @__PURE__ */ Object.create(null), stored?.closed) };
+  for (const map of [quota.active, quota.closed]) for (const [id, expires] of Object.entries(map)) if (expires <= now) delete map[id];
+  return quota;
+}
+__name(currentQuota, "currentQuota");
+async function admitRoom(store, matchId, ttl, now) {
+  const q = currentQuota(await store.get("quota"), now);
+  let result;
+  if (Object.hasOwn(q.closed, matchId)) result = { status: 409, body: { code: "ROOM_FINISHED", error: "\u6B64\u5834\u4F5C\u6230\u5DF2\u7D50\u675F\uFF0C\u8ACB\u8FD4\u56DE\u5927\u5EF3\u5EFA\u7ACB\u65B0\u623F\u9593\u3002" } };
+  else if (Object.hasOwn(q.active, matchId)) result = { status: 200, body: { allowed: true } };
+  else if (q.count >= ADMISSION_LIMITS.daily) {
+    const retryAt = Date.parse(q.day + "T00:00:00Z") + DAY;
+    result = { status: 429, retryAfter: Math.ceil((retryAt - now) / 1e3), body: { code: "DAILY_LIMIT", error: "\u6BCF\u65E5\u6E2C\u8A66\u5834\u6B21\u5DF2\u9054 100 \u5834\uFF0C\u65BC UTC 00:00\uFF08\u53F0\u7063\u6642\u9593 08:00\uFF09\u91CD\u8A2D\u3002", retryAt, limit: ADMISSION_LIMITS.daily } };
+  } else if (Object.keys(q.active).length >= ADMISSION_LIMITS.concurrent) result = { status: 429, body: { code: "ROOM_LIMIT", error: "\u540C\u6642\u4F5C\u6230\u623F\u9593\u5DF2\u6EFF\uFF08\u6700\u591A 3 \u9593\uFF09\uFF0C\u8ACB\u7B49\u5176\u4ED6\u4F5C\u6230\u7D50\u675F\u5F8C\u518D\u8A66\u3002", limit: ADMISSION_LIMITS.concurrent } };
+  else {
+    q.count++;
+    q.active[matchId] = now + (ttl === 10 * 6e4 ? ttl : 6 * 6e4);
+    result = { status: 200, body: { allowed: true } };
+  }
+  await store.put("quota", q);
+  return result;
+}
+__name(admitRoom, "admitRoom");
+async function releaseRoom(store, matchId, now) {
+  const q = currentQuota(await store.get("quota"), now);
+  delete q.active[matchId];
+  q.closed[matchId] ??= now + DAY;
+  await store.put("quota", q);
+  return { released: true };
+}
+__name(releaseRoom, "releaseRoom");
+
 // src/diagnostics.mjs
-var BACKEND_VERSION = 20;
+var BACKEND_VERSION = 21;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -692,7 +729,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, transportDiagnostics: true, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname === "/results" && request.method === "POST") {
     const raw = await request.text();
@@ -742,6 +779,9 @@ var BattleService = class extends DurableObject {
     this.saved = false;
     this.inputTiming = [new InputTiming(), new InputTiming()];
     this.egressProbe = null;
+    this.admissionReleased = false;
+    this.releasePending = null;
+    this.nextRelease = 0;
     ctx.blockConcurrencyWhile(async () => {
       const stored = await ctx.storage.get("match");
       if (stored) {
@@ -759,6 +799,7 @@ var BattleService = class extends DurableObject {
           await ctx.storage.put("match", { ...stored, result: this.room.result });
         }
         this.saved = true;
+        void this.releaseAdmission();
       }
     });
   }
@@ -770,19 +811,13 @@ var BattleService = class extends DurableObject {
       return response({ result: this.room.result });
     }
     if (path === "/admit") {
-      const { matchId, ttl } = await request.json(), now = Date.now(), day = new Date(now).toISOString().slice(0, 10);
-      return this.ctx.storage.transaction(async (store) => {
-        let quota = await store.get("quota") || { day, count: 0, active: {} };
-        if (quota.day !== day) quota = { day, count: 0, active: quota.active };
-        for (const [id, expires] of Object.entries(quota.active)) if (expires < now) delete quota.active[id];
-        if (!quota.active[matchId]) {
-          if (quota.count >= 100 || Object.keys(quota.active).length >= 3) return response({ error: "\u514D\u8CBB\u6E2C\u8A66\u984D\u5EA6\u5DF2\u9054\u4E0A\u9650\uFF0C\u8ACB\u7A0D\u5F8C\u518D\u8A66\u3002" }, 429);
-          quota.count++;
-          quota.active[matchId] = now + (ttl === 10 * 6e4 ? ttl : 6 * 6e4);
-          await store.put("quota", quota);
-        }
-        return response({ allowed: true });
-      });
+      const { matchId, ttl } = await request.json();
+      const decision = await this.ctx.storage.transaction((store) => admitRoom(store, matchId, ttl, Date.now()));
+      return Response.json(decision.body, { status: decision.status, headers: { "Cache-Control": "no-store", ...decision.retryAfter ? { "Retry-After": String(decision.retryAfter) } : {} } });
+    }
+    if (path === "/release" && request.method === "POST") {
+      const { matchId } = await request.json();
+      return response(await this.ctx.storage.transaction((store) => releaseRoom(store, matchId, Date.now())));
     }
     if (path === "/create") {
       const data = await request.json();
@@ -859,6 +894,32 @@ var BattleService = class extends DurableObject {
     socket.addEventListener("error", close);
     return new Response(null, { status: 101, webSocket: client });
   }
+  releaseAdmission(force = false) {
+    if (this.admissionReleased) return Promise.resolve(true);
+    if (this.releasePending) return this.releasePending;
+    if (!this.room?.result || !force && Date.now() < this.nextRelease) return Promise.resolve(false);
+    this.nextRelease = Date.now() + 5e3;
+    const pending = (async () => {
+      try {
+        const gate = this.env.BATTLE_ROOMS.get(this.env.BATTLE_ROOMS.idFromName("__admission"));
+        const r = await gate.fetch(new Request("https://internal/release", { method: "POST", body: JSON.stringify({ matchId: this.room.id }) }));
+        if (!r.ok) throw Error("Admission release failed");
+        this.admissionReleased = true;
+        return true;
+      } catch {
+        try {
+          await this.ctx.storage.setAlarm(Math.min(this.created + 864e5, Date.now() + 3e4));
+        } catch {
+        }
+        return false;
+      } finally {
+        this.releasePending = null;
+      }
+    })();
+    this.releasePending = pending;
+    this.ctx.waitUntil(pending);
+    return pending;
+  }
   run() {
     if (this.timer) return;
     this.timer = setInterval(() => {
@@ -887,6 +948,7 @@ var BattleService = class extends DurableObject {
         } catch {
         }
       }
+      if (this.room.result) void this.releaseAdmission();
       if (this.room.result && !this.saved && !this.writing) {
         this.writing = true;
         this.ctx.waitUntil(this.ctx.storage.put("match", { id: this.room.id, players: this.room.game.players.map((p) => ({ id: p.id, name: p.name, aircraft: p.aircraft, mission: this.room.game.campaign })), created: this.created, result: this.room.result }).then(() => {
@@ -907,6 +969,12 @@ var BattleService = class extends DurableObject {
     }, 1e3 / 30);
   }
   async alarm() {
+    if (this.room?.result && Date.now() < this.created + 864e5) {
+      await this.releaseAdmission(true);
+      await this.ctx.storage.setAlarm(this.admissionReleased ? this.created + 864e5 : Math.min(this.created + 864e5, Date.now() + 3e4));
+      return;
+    }
+    if (this.room?.result) await this.releaseAdmission(true);
     if (this.timer) clearInterval(this.timer);
     for (const socket of this.sockets.values()) socket.close(1e3, "Expired");
     this.sockets.clear();
