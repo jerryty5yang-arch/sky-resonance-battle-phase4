@@ -39,7 +39,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 25;
+var BACKEND_VERSION = 26;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -94,6 +94,10 @@ function skillBuild(value, mission) {
   return mission === "survival" && validSkillBuild(value) ? [...value] : [0, 0, 0];
 }
 __name(skillBuild, "skillBuild");
+function skillBuildReady(value, mission) {
+  return mission !== "survival" || validSkillBuild(value) && value.reduce((a, b) => a + b, 0) === 3;
+}
+__name(skillBuildReady, "skillBuildReady");
 
 // ../dist/singers.js
 var SINGERS = Object.freeze({
@@ -170,7 +174,7 @@ function skillCooldown(a) {
 __name(skillCooldown, "skillCooldown");
 function skillWeaponReady(a) {
   if (a.hp <= 0) return false;
-  if (a.skill?.kind === "charge") return a.skillCampaign && (levels(a)[2] >= 2 || levels(a)[0] === 3 && a.skill.elapsed < 1.5);
+  if (a.skill?.kind === "charge") return a.skillCampaign && a.skill.elapsed >= 0.22 && (levels(a)[2] >= 2 || levels(a)[0] === 3 && a.skill.elapsed < 1.5);
   return !(a.missileCd > 1e-8 || a.weaponGap > 1e-8 || a.skill?.kind === "dash");
 }
 __name(skillWeaponReady, "skillWeaponReady");
@@ -253,7 +257,7 @@ function startSkillWeapon(a, p, input, launch, ctx = {}) {
 __name(startSkillWeapon, "startSkillWeapon");
 function releaseBeam(a, p, targets, hit, bullets) {
   const [f, m, t] = levels(a), charged = f === 3 && !a.skill.queued, scale = charged ? 1.3 : 1, damage = (f ? 200 : 180) * (charged ? 1.5 : 1);
-  const beam = { kind: "beam", remaining: 0.32, total: 0.32, x0: p.x, y0: p.y - 24, x1: p.x, y1: Math.max(-100, p.y - 674), width: 22 * scale, widthScale: scale };
+  const beam = { kind: "beam", remaining: 0.32, total: 0.32, x0: p.x, y0: p.y - 24, x1: p.x, y1: Math.max(-100, p.y - 674), width: 22 * scale, widthScale: scale, flame: charged };
   a.skill = beam;
   let n = 0;
   for (const e of [...targets].sort((a2, b) => b.y - a2.y)) {
@@ -293,8 +297,8 @@ function stepSkillWeapon(a, p, dt, targets, hit, bullets = []) {
     if (fx.kind === "mine" && fx.remaining === 0) {
       for (let i = 0; i < 6; i++) {
         const angle = -Math.PI / 2 + i * Math.PI / 3, s2 = { x0: fx.x, y0: fx.y, x1: fx.x + Math.cos(angle) * 2e3, y1: fx.y + Math.sin(angle) * 2e3 };
-        for (const e of targets) if (e.hp > 0 && lineDistance(e, s2) <= 8 + (e.r || 0)) hit(e, 30);
-        addFx(a, { ...s2, kind: "mineBeam", remaining: 0.32, total: 0.32, width: 8 });
+        for (const e of targets) if (e.hp > 0 && lineDistance(e, s2) <= 12 + (e.r || 0)) hit(e, 30);
+        addFx(a, { ...s2, kind: "mineBeam", remaining: 0.32, total: 0.32, width: 12 });
       }
     }
   }
@@ -379,7 +383,7 @@ function makeSkillMissiles(a, p, targets, makeId) {
   }
   const registry = volleys.get(a) || /* @__PURE__ */ new Map();
   volleys.set(a, registry);
-  registry.set(id, { counts: /* @__PURE__ */ new Map(), returned: 0 });
+  registry.set(id, { counts: /* @__PURE__ */ new Map(), boosts: /* @__PURE__ */ new Map(), returned: 0 });
   return Array.from({ length: n }, (_, i) => {
     const target = t === 3 ? order[i % order.length] || null : f === 3 ? order[0] || null : nearestEnemy(live, p);
     return { id: makeId?.(), owner: a.slot || 0, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: t ? 4.5 : 3.5, age: 0, damage: f ? 22 : 20, super: false, weaponVolley: id, lockIndex: i, target, targetId: target?.id ?? null, rehunts: 0, impacts: 0 };
@@ -415,6 +419,15 @@ function stepSkillMissile(a, missile, dt, targets, hit) {
     volley?.counts.set(e, count);
     const amount = missile.damage * (f === 3 ? 1 + Math.min((count - 1) * 0.1, 0.6) : 1);
     hit(e, amount);
+    if (f === 3 && count > 1) {
+      let fx = volley?.boosts.get(e);
+      if (!fx || !a.weaponFx.includes(fx)) {
+        fx = { kind: "lockBoost" };
+        volley?.boosts.set(e, fx);
+        addFx(a, fx);
+      }
+      Object.assign(fx, { x: e.x, y: e.y, r: e.r || 20, boost: Math.min(count - 1, 6) * 10, remaining: 0.65, total: 0.65 });
+    }
     const killedDirect = e.hp <= 0;
     missile.impacts++;
     if (m >= 2) e.stun = (e.stun || 0) + 0.5 / 2 ** (count - 1);
@@ -1085,7 +1098,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -1116,6 +1129,7 @@ var worker_default = { async fetch(request, env) {
     if (raw.length > 4096) return response({ error: "Too large" }, 413);
     const data = env.SITE_PUBLIC_KEY ? await verifyRoom(env.SITE_PUBLIC_KEY, raw, request.headers.get("X-Battle-Signature")) : await verify(env.BATTLE_SECRET, raw, request.headers.get("X-Battle-Signature"));
     if (!data || data.aud !== "sky-room-create" || !rosterValid(data.players) || typeof data.matchId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.matchId)) return response({ error: "Unauthorized" }, 401);
+    if (!data.players.every((p) => skillBuildReady(p.build, data.players[0].mission))) return response({ error: "\u751F\u5B58\u4E4B\u9053\u9700\u6240\u6709\u73A9\u5BB6\u7528\u5B8C 3 \u9EDE\u5F37\u5316\u9EDE\u6578\u624D\u80FD\u51FA\u64CA\u3002" }, 409);
     const gate = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName("__admission"));
     const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
     if (!admitted.ok) return admitted;
