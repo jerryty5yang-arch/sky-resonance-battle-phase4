@@ -39,7 +39,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 21;
+var BACKEND_VERSION = 22;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -729,8 +729,24 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
+  if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
+    if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
+    const id = url.pathname.slice(7), protocols = (request.headers.get("Sec-WebSocket-Protocol") || "").split(",").map((s) => s.trim());
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id) || !protocols.includes("sky-probe")) return response({ error: "Invalid probe" }, 400);
+    let signed;
+    try {
+      const token = protocols.find((p) => p.startsWith("ticket."))?.slice(7);
+      if (!token || token.length > 2048) throw Error();
+      signed = JSON.parse(atob(token.replaceAll("-", "+").replaceAll("_", "/")));
+    } catch {
+      return response({ error: "Unauthorized" }, 401);
+    }
+    const claim = env.SITE_PUBLIC_KEY ? await verifyRoom(env.SITE_PUBLIC_KEY, signed?.body, signed?.signature) : await verify(env.BATTLE_SECRET, signed?.body, signed?.signature);
+    if (!claim || claim.aud !== "sky-room-probe" || claim.matchId !== id || typeof claim.playerId !== "string" || claim.playerId.length > 100 || claim.exp > Date.now() + 6e4) return response({ error: "Unauthorized" }, 401);
+    return env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(id), { locationHint: roomLocationHint(env) }).fetch(new Request("https://internal/probe", { headers: { Upgrade: "websocket", "X-Probe-Player": claim.playerId } }));
+  }
   if (url.pathname === "/results" && request.method === "POST") {
     const raw = await request.text();
     if (raw.length > 4096) return response({ error: "Too large" }, 413);
@@ -782,6 +798,8 @@ var BattleService = class extends DurableObject {
     this.admissionReleased = false;
     this.releasePending = null;
     this.nextRelease = 0;
+    this.probePlayers = /* @__PURE__ */ new Map();
+    this.probeSockets = /* @__PURE__ */ new Set();
     ctx.blockConcurrencyWhile(async () => {
       const stored = await ctx.storage.get("match");
       if (stored) {
@@ -805,6 +823,42 @@ var BattleService = class extends DurableObject {
   }
   async fetch(request) {
     const path = new URL(request.url).pathname;
+    if (path === "/probe") {
+      const player = request.headers.get("X-Probe-Player"), now = Date.now();
+      if (this.probeSockets.size >= 2 || now - (this.probePlayers.get(player) || 0) < 15e3) return response({ error: "Please wait before retrying" }, 429);
+      this.probePlayers.set(player, now);
+      if (this.probePlayers.size > 8) this.probePlayers.delete(this.probePlayers.keys().next().value);
+      const pair2 = new WebSocketPair(), client2 = pair2[0], socket2 = pair2[1];
+      socket2.accept();
+      this.probeSockets.add(socket2);
+      let count2 = 0;
+      const timeout2 = setTimeout(() => {
+        try {
+          socket2.close(1e3, "Probe complete");
+        } catch {
+        }
+        cleanup();
+      }, 1e4);
+      const cleanup = /* @__PURE__ */ __name(() => {
+        clearTimeout(timeout2);
+        this.probeSockets.delete(socket2);
+      }, "cleanup");
+      socket2.addEventListener("close", cleanup);
+      socket2.addEventListener("error", cleanup);
+      socket2.addEventListener("message", (event) => {
+        try {
+          if (typeof event.data !== "string" || event.data.length > 128 || ++count2 > 10) throw Error();
+          const msg = JSON.parse(event.data);
+          if (msg.type !== "ping" || !Number.isSafeInteger(msg.nonce)) throw Error();
+          socket2.send(JSON.stringify({ type: "pong", nonce: msg.nonce }));
+        } catch {
+          socket2.close(1008, "Invalid probe");
+          cleanup();
+        }
+      });
+      socket2.send(JSON.stringify({ type: "probe-ready", version: BACKEND_VERSION }));
+      return new Response(null, { status: 101, webSocket: client2, headers: { "Sec-WebSocket-Protocol": "sky-probe" } });
+    }
     if (path === "/result") {
       if (!this.room) return response({ error: "Result expired" }, 404);
       if (!this.room.result) return response({ pending: true }, 202);
