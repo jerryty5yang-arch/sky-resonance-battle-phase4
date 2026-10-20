@@ -39,7 +39,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 22;
+var BACKEND_VERSION = 23;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -83,6 +83,23 @@ var InputTiming = class {
     return { seq: p.seq, simulationWaitMs: Math.max(0, p.applied - p.received), snapshotWaitMs: Math.max(0, now - p.applied) };
   }
 };
+
+// ../dist/singers.js
+var SINGERS = Object.freeze({
+  freyja: Object.freeze({ id: "freyja", name: "\u8299\u857E\u96C5\u30FB\u7DAD\u6069", short: "\u8299\u857E\u96C5", number: 1, role: "\u5F48\u5E55\u63A7\u5236\uFF0F\u7206\u767C\u6E05\u5834", color: "#ffb271", duration: 6, energy: 100, move: 1.5, bullet: 0.4, enemyMove: 1, fire: 1, vulnerability: 1, shields: 0, heal: 0, critChance: 0, critDamage: 1, burst: true, description: "\u5168\u968A\u79FB\u901F \xD71.5\uFF1B\u6575\u5F48\u901F\u5EA6 \xD70.4\uFF1B\u7D50\u675F\u6642\u50C5\u65BD\u653E\u8005\u767C\u5C04 16 \u679A\u905E\u6E1B\u50B7\u5BB3\u8FFD\u8E64\u98DB\u5F48\u3002" }),
+  kaname: Object.freeze({ id: "kaname", name: "\u8299\u82BD\u30FB\u5DF4\u5361\u59AE\u96C5", short: "\u8299\u82BD", number: 2, role: "\u9632\u79A6\u7E8C\u6230\uFF0F\u5F31\u9EDE\u589E\u50B7", color: "#ffc767", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 1, fire: 1, vulnerability: 1.25, shields: 2, heal: 20, critChance: 0, critDamage: 1, burst: false, description: "\u5168\u968A\u5404\u7372\u8B77\u76FE\uFF0C\u6700\u591A\u62B5\u64CB 2 \u6B21\u6709\u6548\u547D\u4E2D\uFF1B\u6575\u4EBA\u53D7\u50B7 \xD71.25\uFF1B\u65BD\u653E\u8005\u7ACB\u5373\u56DE\u5FA9 20 HP\uFF08\u4E0A\u9650 100\uFF09\u3002" }),
+  mikumo: Object.freeze({ id: "mikumo", name: "\u7F8E\u96F2\u30FB\u57FA\u52AA\u7F8E\u723E", short: "\u7F8E\u96F2", number: 3, role: "\u6301\u7E8C\u706B\u529B\uFF0F\u6575\u6A5F\u58D3\u5236", color: "#cbb1ff", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 0.4, fire: 1.3, vulnerability: 1, shields: 0, heal: 0, critChance: 0.15, critDamage: 2, burst: false, description: "\u5168\u968A\u4E3B\u6B66\u5668\u5C04\u901F \xD71.3\uFF1B\u6575\u6A5F\u79FB\u901F \xD70.4\uFF1B\u50C5\u65BD\u653E\u8005\u4E3B\u6B66\u5668\u8207\u5C08\u5C6C\u6B66\u88DD\u6BCF\u6B21\u6709\u6548\u547D\u4E2D\u7368\u7ACB\u5224\u5B9A 15% \u66B4\u64CA\u3001\u50B7\u5BB3 \xD72\u3002" })
+});
+var validSinger = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(SINGERS, id), "validSinger");
+var singerRules = /* @__PURE__ */ __name((id) => SINGERS[validSinger(id) ? id : "freyja"], "singerRules");
+function supportRules(world) {
+  return singerRules(world.supportSinger || world.singer);
+}
+__name(supportRules, "supportRules");
+function criticalDamage(amount, enabled, random) {
+  return enabled && random() < 0.15 ? amount * 2 : amount;
+}
+__name(criticalDamage, "criticalDamage");
 
 // ../dist/missions.js
 var MISSIONS = Object.freeze({ survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
@@ -200,23 +217,6 @@ var SupportDamage = class {
     for (const id of this.volleys.keys()) if (!active.has(id)) this.volleys.delete(id);
   }
 };
-
-// ../dist/singers.js
-var SINGERS = Object.freeze({
-  freyja: Object.freeze({ id: "freyja", name: "\u8299\u857E\u96C5\u30FB\u7DAD\u6069", short: "\u8299\u857E\u96C5", number: 1, role: "\u5F48\u5E55\u63A7\u5236\uFF0F\u7206\u767C\u6E05\u5834", color: "#ffb271", duration: 6, energy: 100, move: 1.5, bullet: 0.4, enemyMove: 1, fire: 1, vulnerability: 1, shields: 0, heal: 0, critChance: 0, critDamage: 1, burst: true, description: "\u5168\u968A\u79FB\u901F \xD71.5\uFF1B\u6575\u5F48\u901F\u5EA6 \xD70.4\uFF1B\u7D50\u675F\u6642\u50C5\u65BD\u653E\u8005\u767C\u5C04 16 \u679A\u905E\u6E1B\u50B7\u5BB3\u8FFD\u8E64\u98DB\u5F48\u3002" }),
-  kaname: Object.freeze({ id: "kaname", name: "\u8299\u82BD\u30FB\u5DF4\u5361\u59AE\u96C5", short: "\u8299\u82BD", number: 2, role: "\u9632\u79A6\u7E8C\u6230\uFF0F\u5F31\u9EDE\u589E\u50B7", color: "#ffc767", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 1, fire: 1, vulnerability: 1.25, shields: 2, heal: 20, critChance: 0, critDamage: 1, burst: false, description: "\u5168\u968A\u5404\u7372\u8B77\u76FE\uFF0C\u6700\u591A\u62B5\u64CB 2 \u6B21\u6709\u6548\u547D\u4E2D\uFF1B\u6575\u4EBA\u53D7\u50B7 \xD71.25\uFF1B\u65BD\u653E\u8005\u7ACB\u5373\u56DE\u5FA9 20 HP\uFF08\u4E0A\u9650 100\uFF09\u3002" }),
-  mikumo: Object.freeze({ id: "mikumo", name: "\u7F8E\u96F2\u30FB\u57FA\u52AA\u7F8E\u723E", short: "\u7F8E\u96F2", number: 3, role: "\u6301\u7E8C\u706B\u529B\uFF0F\u6575\u6A5F\u58D3\u5236", color: "#cbb1ff", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 0.4, fire: 1.3, vulnerability: 1, shields: 0, heal: 0, critChance: 0.15, critDamage: 2, burst: false, description: "\u5168\u968A\u4E3B\u6B66\u5668\u5C04\u901F \xD71.3\uFF1B\u6575\u6A5F\u79FB\u901F \xD70.4\uFF1B\u50C5\u65BD\u653E\u8005\u4E3B\u6B66\u5668\u8207\u5C08\u5C6C\u6B66\u88DD\u6BCF\u6B21\u6709\u6548\u547D\u4E2D\u7368\u7ACB\u5224\u5B9A 15% \u66B4\u64CA\u3001\u50B7\u5BB3 \xD72\u3002" })
-});
-var validSinger = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(SINGERS, id), "validSinger");
-var singerRules = /* @__PURE__ */ __name((id) => SINGERS[validSinger(id) ? id : "freyja"], "singerRules");
-function supportRules(world) {
-  return singerRules(world.supportSinger || world.singer);
-}
-__name(supportRules, "supportRules");
-function criticalDamage(amount, enabled, random) {
-  return enabled && random() < 0.15 ? amount * 2 : amount;
-}
-__name(criticalDamage, "criticalDamage");
 
 // src/combat.mjs
 var clamp = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
@@ -540,6 +540,7 @@ var BattleRoom = class {
   }
   constructor(id, players, { random = Math.random } = {}) {
     if (players.length !== 2 || players[0].id === players[1].id) throw Error("Two distinct players required");
+    this.singerLocked = players.map((p) => validSinger(p.singer));
     this.id = id;
     this.game = new CoopCombat(players, random);
     this.phase = "loading";
@@ -579,7 +580,7 @@ var BattleRoom = class {
     if (!this.online[slot]) return false;
     if (data.type === "loaded" && this.phase === "loading") {
       if (!this.loaded[slot] && data.singer !== void 0) {
-        if (!validSinger(data.singer)) return false;
+        if (!validSinger(data.singer) || this.singerLocked[slot] && data.singer !== this.game.players[slot].singer) return false;
         this.game.players[slot].singer = data.singer;
       }
       this.loaded[slot] = true;
@@ -725,11 +726,11 @@ __name(verifyRoom, "verifyRoom");
 
 // src/worker.mjs
 var response = /* @__PURE__ */ __name((body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } }), "response");
-var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && players.length === 2 && players.every((p) => (p.mission === void 0 || validMission(p.mission)) && (p.aircraft === void 0 || validAircraft(p.aircraft)) && typeof p.id === "string" && p.id.length < 100 && typeof p.name === "string" && p.name.length <= 160) && players[0].id !== players[1].id, "rosterValid");
+var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && players.length === 2 && players.every((p) => (p.singer === void 0 || validSinger(p.singer)) && (p.mission === void 0 || validMission(p.mission)) && (p.aircraft === void 0 || validAircraft(p.aircraft)) && typeof p.id === "string" && p.id.length < 100 && typeof p.name === "string" && p.name.length <= 160) && players[0].id !== players[1].id, "rosterValid");
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -766,7 +767,7 @@ var worker_default = { async fetch(request, env) {
     const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: roomLocationHint(env) });
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
-    return response({ survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
+    return response({ lobbyLoadoutLock: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
   }
   if (url.pathname.startsWith("/room/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
