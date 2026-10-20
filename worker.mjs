@@ -39,7 +39,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 24;
+var BACKEND_VERSION = 25;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -133,6 +133,21 @@ __name(aircraftShots, "aircraftShots");
 
 // src/worker.mjs
 import { DurableObject } from "cloudflare:workers";
+
+// ../dist/missile-targeting.js
+function nearestEnemy(targets, origin) {
+  let best = null, distance = Infinity;
+  for (const e of targets) {
+    if (e.hp <= 0) continue;
+    const d = (e.x - origin.x) ** 2 + (e.y - origin.y) ** 2;
+    if (d < distance) {
+      distance = d;
+      best = e;
+    }
+  }
+  return best;
+}
+__name(nearestEnemy, "nearestEnemy");
 
 // ../dist/weapon-skills.js
 var volleys = /* @__PURE__ */ new WeakMap();
@@ -314,10 +329,10 @@ function stepSkillWeapon(a, p, dt, targets, hit, bullets = []) {
         for (const e of targets) if (e.hp > 0 && lineDistance(e, slash) < (e.r || 0) + 18) hit(e, 52.5);
         addFx(a, { ...slash, kind: "slash", remaining: 0.3, total: 0.3, width: 18 });
       }
-      if (t >= 2) radial(a, targets, hit, p.x, p.y, 45, 45, "impact");
+      if (t >= 2) radial(a, targets, hit, p.x, p.y, 100, 45, "impact");
       if (t === 3) {
-        radial(a, targets, hit, p.x, p.y, 100, 45, "shock");
-        clearCircle(bullets, p.x, p.y, 100);
+        radial(a, targets, hit, p.x, p.y, 150, 45, "shock");
+        clearCircle(bullets, p.x, p.y, 150);
       }
       s.kind = "trail";
       s.remaining = 0.18;
@@ -366,7 +381,7 @@ function makeSkillMissiles(a, p, targets, makeId) {
   volleys.set(a, registry);
   registry.set(id, { counts: /* @__PURE__ */ new Map(), returned: 0 });
   return Array.from({ length: n }, (_, i) => {
-    const target = order.length ? order[f === 3 ? 0 : i % order.length] : null;
+    const target = t === 3 ? order[i % order.length] || null : f === 3 ? order[0] || null : nearestEnemy(live, p);
     return { id: makeId?.(), owner: a.slot || 0, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: t ? 4.5 : 3.5, age: 0, damage: f ? 22 : 20, super: false, weaponVolley: id, lockIndex: i, target, targetId: target?.id ?? null, rehunts: 0, impacts: 0 };
   });
 }
@@ -375,13 +390,13 @@ var rank = /* @__PURE__ */ __name((e) => e.type === "boss" ? 0 : e.type === "eli
 function stepSkillMissile(a, missile, dt, targets, hit) {
   if (missile.super || missile.weaponVolley === void 0) return false;
   const [f, m, t] = levels(a), live = targets.filter((e2) => e2.hp > 0), old = missile.target;
-  let e = old?.hp > 0 ? old : live.find((e2) => e2.id === missile.targetId);
+  let e = old?.hp > 0 && live.includes(old) ? old : missile.targetId != null ? live.find((e2) => e2.id === missile.targetId) : null;
   if (!e) {
     if (f === 3) e = [...live].sort((a2, b) => rank(a2) - rank(b) || b.hp - a2.hp || (a2.id || 0) - (b.id || 0))[0];
     else if (t === 3) {
       const ordered = [...live].sort((a2, b) => rank(b) - rank(a2) || (a2.id || 0) - (b.id || 0)), same = ordered.filter((e2) => rank(e2) === rank(ordered[0]));
       e = same.length ? same[((missile.lockIndex || 0) + missile.rehunts) % same.length] : void 0;
-    } else e = live[0];
+    } else e = nearestEnemy(live, missile);
   }
   missile.target = e || null;
   missile.targetId = e?.id ?? null;
@@ -431,7 +446,7 @@ function pruneSkillVolleys(a, missiles) {
 __name(pruneSkillVolleys, "pruneSkillVolleys");
 
 // ../dist/weapons.js
-var WEAPONS = { balanced: { name: "\u591A\u91CD\u9396\u5B9A", cooldown: 8, description: "8 \u679A\u8FFD\u8E64\u98DB\u5F48 \xB7 \u51B7\u537B 8 \u79D2" }, swift: { name: "\u75BE\u98A8\u7A81\u9032", cooldown: 6, description: "\u6CBF\u79FB\u52D5\u65B9\u5411\u7A81\u9032 \xB7 \u885D\u523A\u4E2D\u7121\u6575 0.35 \u79D2\uFF0C\u7D50\u675F\u5F8C\u53E6\u52A0 0.15 \u79D2 \xB7 \u51B7\u537B 6 \u79D2" }, heavy: { name: "\u8CAB\u7A7F\u91CD\u7832", cooldown: 10, description: "\u84C4\u529B 1.2 \u79D2\u5F8C\u767C\u5C04\u8CAB\u7A7F\u5149\u675F \xB7 \u51B7\u537B 10 \u79D2" } };
+var WEAPONS = { balanced: { name: "\u591A\u91CD\u9396\u5B9A", cooldown: 8, description: "8 \u679A\u98DB\u5F48\u9396\u5B9A\u6700\u8FD1\u6575\u6A5F \xB7 \u76EE\u6A19\u6B7B\u4EA1\u5F8C\u91CD\u65B0\u9396\u5B9A \xB7 \u51B7\u537B 8 \u79D2" }, swift: { name: "\u75BE\u98A8\u7A81\u9032", cooldown: 6, description: "\u6CBF\u79FB\u52D5\u65B9\u5411\u7A81\u9032 \xB7 \u885D\u523A\u4E2D\u7121\u6575 0.35 \u79D2\uFF0C\u7D50\u675F\u5F8C\u53E6\u52A0 0.15 \u79D2 \xB7 \u51B7\u537B 6 \u79D2" }, heavy: { name: "\u8CAB\u7A7F\u91CD\u7832", cooldown: 10, description: "\u84C4\u529B 1.2 \u79D2\u5F8C\u767C\u5C04\u8CAB\u7A7F\u5149\u675F \xB7 \u51B7\u537B 10 \u79D2" } };
 var weaponRules = /* @__PURE__ */ __name((id) => WEAPONS[Object.hasOwn(WEAPONS, id) ? id : "balanced"], "weaponRules");
 function startWeapon(actor, pos, aircraft, input, launch) {
   if (actor.skillCampaign) return startSkillWeapon(actor, pos, input, launch);
@@ -624,7 +639,7 @@ var CoopCombat = class {
     }
     const burstId = support ? this.supportDamage.begin() : null;
     const targets = [...this.enemies.filter((e) => e.hp > 0), ...this.boss?.hp > 0 ? [this.boss] : []];
-    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, targetId: !support && targets.length ? targets[i % targets.length].id : null, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: support ? 4.5 : 3.5, age: 0, damage: support ? 40 : 20, burstId, super: support });
+    for (let i = 0; i < n; i++) this.missiles.push({ id: this.nextId++, owner: p.slot, targetId: !support ? nearestEnemy(targets, p)?.id ?? null : null, x: p.x + (i % 2 ? 18 : -18), y: p.y, vx: (i % 2 ? 1 : -1) * 150, vy: -50, life: support ? 4.5 : 3.5, age: 0, damage: support ? 40 : 20, burstId, super: support });
   }
   damage(e, amount, owner) {
     if (e.hp <= 0 || this.state !== "playing") return;
@@ -833,8 +848,8 @@ var CoopCombat = class {
       if (owner && stepSkillMissile(owner, m, dt, targets, (e2, n) => this.strike(e2, n, this.res > 0 && rules.critChance > 0 && m.owner === this.supportSlot, m.owner))) continue;
       m.life -= dt;
       m.age += dt;
-      const e = targets.find((e2) => e2.id === m.targetId && e2.hp > 0) || targets.find((e2) => e2.hp > 0);
-      if (e) m.targetId = e.id;
+      const e = targets.find((e2) => e2.id === m.targetId && e2.hp > 0) || (m.super ? targets.find((e2) => e2.hp > 0) : nearestEnemy(targets, m));
+      m.targetId = e?.id ?? null;
       if (m.age > 0.18) {
         const a = e ? Math.atan2(e.y - m.y, e.x - m.x) : -Math.PI / 2, v = m.super ? 530 : 430;
         m.vx += (Math.cos(a) * v - m.vx) * Math.min(1, dt * 5);
@@ -1070,7 +1085,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
