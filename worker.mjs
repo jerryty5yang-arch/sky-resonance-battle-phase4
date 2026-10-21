@@ -22,7 +22,7 @@ async function admitRoom(store, matchId, ttl, now) {
   } else if (Object.keys(q.active).length >= ADMISSION_LIMITS.concurrent) result = { status: 429, body: { code: "ROOM_LIMIT", error: "\u540C\u6642\u4F5C\u6230\u623F\u9593\u5DF2\u6EFF\uFF08\u6700\u591A 3 \u9593\uFF09\uFF0C\u8ACB\u7B49\u5176\u4ED6\u4F5C\u6230\u7D50\u675F\u5F8C\u518D\u8A66\u3002", limit: ADMISSION_LIMITS.concurrent } };
   else {
     q.count++;
-    q.active[matchId] = now + (ttl === 10 * 6e4 ? ttl : 6 * 6e4);
+    q.active[matchId] = now + ([10 * 6e4, 24 * 60 * 6e4].includes(ttl) ? ttl : 6 * 6e4);
     result = { status: 200, body: { allowed: true } };
   }
   await store.put("quota", q);
@@ -39,7 +39,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 26;
+var BACKEND_VERSION = 30;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -91,18 +91,18 @@ function validSkillBuild(value) {
 }
 __name(validSkillBuild, "validSkillBuild");
 function skillBuild(value, mission) {
-  return mission === "survival" && validSkillBuild(value) ? [...value] : [0, 0, 0];
+  return ["survival", "skytest"].includes(mission) && validSkillBuild(value) ? [...value] : [0, 0, 0];
 }
 __name(skillBuild, "skillBuild");
 function skillBuildReady(value, mission) {
-  return mission !== "survival" || validSkillBuild(value) && value.reduce((a, b) => a + b, 0) === 3;
+  return !["survival", "skytest"].includes(mission) || validSkillBuild(value) && value.reduce((a, b) => a + b, 0) === 3;
 }
 __name(skillBuildReady, "skillBuildReady");
 
 // ../dist/singers.js
 var SINGERS = Object.freeze({
   freyja: Object.freeze({ id: "freyja", name: "\u8299\u857E\u96C5\u30FB\u7DAD\u6069", short: "\u8299\u857E\u96C5", number: 1, role: "\u5F48\u5E55\u63A7\u5236\uFF0F\u7206\u767C\u6E05\u5834", color: "#ffb271", duration: 6, energy: 100, move: 1.5, bullet: 0.4, enemyMove: 1, fire: 1, vulnerability: 1, shields: 0, heal: 0, critChance: 0, critDamage: 1, burst: true, description: "\u5168\u968A\u79FB\u901F \xD71.5\uFF1B\u6575\u5F48\u901F\u5EA6 \xD70.4\uFF1B\u7D50\u675F\u6642\u50C5\u65BD\u653E\u8005\u767C\u5C04 16 \u679A\u905E\u6E1B\u50B7\u5BB3\u8FFD\u8E64\u98DB\u5F48\u3002" }),
-  kaname: Object.freeze({ id: "kaname", name: "\u8299\u82BD\u30FB\u5DF4\u5361\u59AE\u96C5", short: "\u8299\u82BD", number: 2, role: "\u9632\u79A6\u7E8C\u6230\uFF0F\u5F31\u9EDE\u589E\u50B7", color: "#ffc767", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 1, fire: 1, vulnerability: 1.25, shields: 2, heal: 20, critChance: 0, critDamage: 1, burst: false, description: "\u5168\u968A\u5404\u7372\u8B77\u76FE\uFF0C\u6700\u591A\u62B5\u64CB 2 \u6B21\u6709\u6548\u547D\u4E2D\uFF1B\u6575\u4EBA\u53D7\u50B7 \xD71.25\uFF1B\u65BD\u653E\u8005\u7ACB\u5373\u56DE\u5FA9 20 HP\uFF08\u4E0A\u9650 100\uFF09\u3002" }),
+  kaname: Object.freeze({ id: "kaname", name: "\u8299\u82BD\u30FB\u5DF4\u5361\u59AE\u96C5", short: "\u8299\u82BD", number: 2, role: "\u9632\u79A6\u7E8C\u6230\uFF0F\u5F31\u9EDE\u589E\u50B7", color: "#ffc767", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 1, fire: 1, vulnerability: 1.25, shields: 1, heal: 20, critChance: 0, critDamage: 1, burst: false, description: "\u5168\u968A\u5404\u7372\u8B77\u76FE\uFF0C\u6700\u591A\u62B5\u64CB 1 \u6B21\u6709\u6548\u547D\u4E2D\uFF1B\u6575\u4EBA\u53D7\u50B7 \xD71.25\uFF1B\u65BD\u653E\u8005\u7ACB\u5373\u56DE\u5FA9 20 HP\uFF08\u4E0A\u9650 100\uFF09\u3002" }),
   mikumo: Object.freeze({ id: "mikumo", name: "\u7F8E\u96F2\u30FB\u57FA\u52AA\u7F8E\u723E", short: "\u7F8E\u96F2", number: 3, role: "\u6301\u7E8C\u706B\u529B\uFF0F\u6575\u6A5F\u58D3\u5236", color: "#cbb1ff", duration: 6, energy: 100, move: 1, bullet: 1, enemyMove: 0.4, fire: 1.3, vulnerability: 1, shields: 0, heal: 0, critChance: 0.15, critDamage: 2, burst: false, description: "\u5168\u968A\u4E3B\u6B66\u5668\u5C04\u901F \xD71.3\uFF1B\u6575\u6A5F\u79FB\u901F \xD70.4\uFF1B\u50C5\u65BD\u653E\u8005\u4E3B\u6B66\u5668\u8207\u5C08\u5C6C\u6B66\u88DD\u6BCF\u6B21\u6709\u6548\u547D\u4E2D\u7368\u7ACB\u5224\u5B9A 15% \u66B4\u64CA\u3001\u50B7\u5BB3 \xD72\u3002" })
 });
 var validSinger = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(SINGERS, id), "validSinger");
@@ -117,7 +117,7 @@ function criticalDamage(amount, enabled, random) {
 __name(criticalDamage, "criticalDamage");
 
 // ../dist/missions.js
-var MISSIONS = Object.freeze({ survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
+var MISSIONS = Object.freeze({ skytest: { id: "skytest", name: "\u96F2\u6D77\u9632\u885B\u6230\u30FB\u6E2C\u8A66\u95DC\u5361", phase: "MISSION 01 / TEST", storm: "\u6575\u8ECD\u8B66\u5831" }, survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
 var validMission = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(MISSIONS, id), "validMission");
 var missionRules = /* @__PURE__ */ __name((id) => MISSIONS[validMission(id) ? id : "sky"], "missionRules");
 
@@ -138,6 +138,173 @@ __name(aircraftShots, "aircraftShots");
 // src/worker.mjs
 import { DurableObject } from "cloudflare:workers";
 
+// ../dist/test-mission.js
+var TEST_ENEMIES = Object.freeze({
+  E01: { name: "\u96E8\u71D5\u5075\u5BDF\u6A5F", hp: 35, speed: 110, r: 17, type: "scout", interval: 2.8 },
+  E02: { name: "\u7375\u96BC\u6514\u622A\u6A5F", hp: 60, speed: 175, r: 18, type: "scout", interval: 2.5 },
+  E03: { name: "\u9435\u9DF9\u91CD\u88DD\u6A5F", hp: 260, speed: 70, r: 28, type: "elite", interval: 2.8 },
+  E04: { name: "\u96F7\u96F2\u7832\u8247", hp: 180, speed: 60, r: 26, type: "elite", interval: 3.2 },
+  E05: { name: "\u8108\u885D\u652F\u63F4\u6A5F", hp: 90, speed: 85, r: 21, type: "scout", interval: 3.8 },
+  E06: { name: "\u5E7B\u5F71\u7A81\u64CA\u6A5F", hp: 75, speed: 125, r: 20, type: "scout", interval: 3 },
+  EX01: { name: "\u96F7\u7FFC\u6307\u63EE\u5B98", hp: 800, speed: 80, r: 36, type: "elite", interval: 2.5 }
+});
+var windows = [[5, 14, "E01", 6], [16, 33, "E01", 12], [35, 43, "E02", 4], [45, 57, "E03", 2], [46, 58, "E01", 6], [65, 72, "E04", 2], [75, 80, "E05", 2], [76, 88, "E01", 8], [90, 98, "E06", 4], [100, 100, "EX01", 1], [120, 129, "E03", 2], [121, 133, "E02", 4]];
+var TEST_WAVES = windows.flatMap(([start, end, kind, n]) => Array.from({ length: n }, (_, i) => ({ time: start + (end - start) * i / Math.max(1, n - 1), kind, index: i }))).sort((a, b) => a.time - b.time);
+var clamp = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
+function spawnTestEnemy(g, kind, index = 0) {
+  const spec = TEST_ENEMIES[kind], coop = !!g.players, side = index % 2 ? 1 : -1;
+  const x = kind === "E02" ? side < 0 ? 35 : 445 : 80 + index % 5 * 80;
+  const e = { ...spec, id: g.nextId ? g.nextId++ : g.testNextId = (g.testNextId || 1e4) + 1, testKind: kind, x, y: -45, startX: x, maxHp: Math.round(spec.hp * (coop ? 1.5 : 1)), age: 0, fire: 1.4, seed: index * 0.8, dashPhase: 0, dashClock: 3, summon: 6 };
+  e.hp = e.maxHp;
+  g.enemies.push(e);
+  return e;
+}
+__name(spawnTestEnemy, "spawnTestEnemy");
+function testDamageMultiplier(g, e) {
+  return g.campaign === "skytest" && e.testKind !== "E05" && e.type !== "boss" && g.enemies.some((s) => s.testKind === "E05" && s.hp > 0 && Math.hypot(s.x - e.x, s.y - e.y) <= 150) ? 0.85 : 1;
+}
+__name(testDamageMultiplier, "testDamageMultiplier");
+function bullet(g, x, y, angle, speed = 135, kind = "normal") {
+  g.bullets.push({ id: g.nextId ? g.nextId++ : void 0, x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: kind === "laser" ? 7 : 5, testBullet: kind });
+}
+__name(bullet, "bullet");
+function fan(g, e, target, n, spread = 0.22) {
+  const a = Math.atan2(target.y - e.y, target.x - e.x);
+  for (let i = 0; i < n; i++) bullet(g, e.x, e.y + 15, a + (i - (n - 1) / 2) * spread);
+}
+__name(fan, "fan");
+function stepTestMission(g, dt, enemyDt, players, onHit, emit) {
+  g.testWaveIndex ??= 0;
+  g.testWarnings = [];
+  const cap = g.players ? 16 : 12;
+  while (g.testWaveIndex < TEST_WAVES.length && TEST_WAVES[g.testWaveIndex].time <= g.stageTime && g.stageTime < 135) {
+    if (g.enemies.filter((e) => e.hp > 0).length >= cap) break;
+    const w = TEST_WAVES[g.testWaveIndex++];
+    spawnTestEnemy(g, w.kind, w.index);
+  }
+  if (g.stageTime >= 135 && g.phase < 1) {
+    g.phase = 1;
+    emit("test-warning");
+  }
+  if (g.stageTime >= 150 && !g.boss) {
+    g.enemies = [];
+    g.bullets = [];
+    const hp = g.players ? 5100 : 3e3;
+    g.boss = { id: g.nextId ? g.nextId++ : 99999, type: "boss", testKind: "BOSS", x: 240, y: -100, r: 70, hp, maxHp: hp, age: 0, fire: 2.2, laserClock: 4.5, summon: 10, warning: 0 };
+    g.bossSpawned = true;
+    g.phase = 2;
+    emit("boss");
+  }
+  const live = players.filter((p) => p.hp > 0 && p.connected !== false);
+  for (const e of g.enemies) {
+    if (e.hp <= 0) continue;
+    const stopped2 = Math.min(dt, e.stun || 0), clock2 = dt - stopped2, edt2 = dt ? enemyDt * clock2 / dt : 0;
+    e.stun = Math.max(0, (e.stun || 0) - dt);
+    e.age += edt2;
+    if (g.stageTime >= 135 && g.stageTime < 150) {
+      e.y -= 160 * dt;
+      continue;
+    }
+    const target2 = live[e.id % Math.max(1, live.length)];
+    if (e.testKind === "E04" || e.testKind === "EX01") {
+      e.y = Math.min(e.testKind === "E04" ? 170 : 185, e.y + e.speed * edt2);
+      e.x = clamp(e.startX + Math.sin(e.age * 0.7) * 30, 45, 435);
+    } else if (e.testKind === "E02") {
+      e.y += e.speed * edt2;
+      e.x = clamp(e.startX + (e.startX < 240 ? 1 : -1) * Math.sin(Math.min(e.age, 3) / 3 * Math.PI / 2) * 220, 25, 455);
+    } else if (e.testKind === "E06") {
+      e.dashClock -= clock2;
+      if (e.dashPhase === 0 && e.dashClock <= 0 && target2) {
+        e.dashPhase = 1;
+        e.dashClock = 0.8;
+        e.dashX = target2.x;
+        e.dashY = target2.y;
+        const l = Math.hypot(target2.x - e.x, target2.y - e.y) || 1;
+        e.dashVX = (target2.x - e.x) / l * 210;
+        e.dashVY = (target2.y - e.y) / l * 210;
+      }
+      if (e.dashPhase === 1) {
+        g.testWarnings.push({ x0: e.x, y0: e.y, x1: e.dashX, y1: e.dashY, kind: "dash" });
+        if (e.dashClock <= 0) {
+          e.dashPhase = 2;
+          e.dashClock = 0.8;
+        }
+      } else if (e.dashPhase === 2) {
+        e.x += e.dashVX * edt2;
+        e.y += e.dashVY * edt2;
+        if (e.dashClock <= 0) {
+          e.dashPhase = 0;
+          e.dashClock = 3;
+        }
+      } else {
+        e.y += e.speed * edt2;
+        e.x = clamp(e.startX + Math.sin(e.age * 2.4) * 55, 25, 455);
+      }
+    } else {
+      e.y += e.speed * edt2;
+      e.x = clamp(e.startX + Math.sin(e.age * 1.5 + e.seed) * 15, 25, 455);
+    }
+    e.fire -= clock2;
+    if (e.fire <= 0 && e.y > 20 && e.y < 600 && target2) {
+      if (e.testKind === "E01") bullet(g, e.x, e.y, Math.PI / 2);
+      else fan(g, e, target2, e.testKind === "E03" ? 3 : e.testKind === "E04" ? 5 : e.testKind === "EX01" ? 7 : e.testKind === "E05" ? 1 : 2);
+      e.fire = e.interval;
+    }
+    if (e.testKind === "EX01" && e.y >= 180) {
+      e.summon -= clock2;
+      if (e.summon <= 0 && g.enemies.filter((n) => n.hp > 0).length < cap - 2) {
+        spawnTestEnemy(g, "E01", 0);
+        spawnTestEnemy(g, "E01", 1);
+        e.summon = 8;
+      }
+    }
+    for (const p of live) if (Math.hypot(e.x - p.x, e.y - p.y) < e.r + 6) {
+      onHit(p, "collision");
+      if (e.testKind !== "EX01") e.y = 900;
+    }
+  }
+  g.enemies = g.enemies.filter((e) => e.hp > 0 && e.y < 870 && e.y > -100);
+  for (const e of g.enemies) e.testProtected = testDamageMultiplier(g, e) < 1;
+  const b = g.boss;
+  if (!b || b.hp <= 0) return;
+  const stopped = Math.min(dt, b.stun || 0), clock = dt - stopped, edt = dt ? enemyDt * clock / dt : 0;
+  b.stun = Math.max(0, (b.stun || 0) - dt);
+  b.age += edt;
+  b.y = Math.min(155, b.y + 65 * edt);
+  b.x = 240 + Math.sin(b.age * 0.5) * 65;
+  if (b.y < 90 || !live.length) return;
+  const angry = b.hp <= b.maxHp * 0.5, target = live[Math.floor(b.age / 6) % live.length];
+  b.fire -= clock;
+  if (b.fire <= 0) {
+    const n = angry ? 11 : 7;
+    for (let i = 0; i < n; i++) {
+      const a = 0.28 + i * (Math.PI - 0.56) / (n - 1);
+      bullet(g, b.x, b.y + 20, a, angry ? 140 : 125);
+    }
+    b.fire = angry ? 2.5 : 3;
+  }
+  b.laserClock -= clock;
+  if (b.warning > 0) {
+    b.warning = Math.max(0, b.warning - clock);
+    g.testWarnings.push({ x0: b.laserX, y0: b.y + 20, x1: b.laserX, y1: 810, kind: "laser" });
+    if (b.warning === 0) {
+      for (let i = 0; i < 9; i++) bullet(g, b.laserX, b.y + 25 + i * 19, Math.PI / 2, 420, "laser");
+      b.laserClock = angry ? 4.5 : 6;
+    }
+  } else if (b.laserClock <= 0) {
+    b.laserX = clamp(target.x + (angry ? b.laserSide ? 45 : -45 : 0), 28, 452);
+    b.laserSide = !b.laserSide;
+    b.warning = 0.8;
+  }
+  b.summon -= clock;
+  if (b.summon <= 0 && g.enemies.length < cap - 3) {
+    for (let i = 0; i < 3; i++) spawnTestEnemy(g, angry && i === 2 ? "E02" : "E01", i);
+    b.summon = 12;
+  }
+  for (const p of live) if (Math.hypot(b.x - p.x, b.y - p.y) < b.r + 6) onHit(p, "collision");
+}
+__name(stepTestMission, "stepTestMission");
+
 // ../dist/missile-targeting.js
 function nearestEnemy(targets, origin) {
   let best = null, distance = Infinity;
@@ -156,7 +323,7 @@ __name(nearestEnemy, "nearestEnemy");
 // ../dist/weapon-skills.js
 var volleys = /* @__PURE__ */ new WeakMap();
 function configureSkills(a, mission, build) {
-  a.skillCampaign = mission === "survival";
+  a.skillCampaign = ["survival", "skytest"].includes(mission);
   a.skillBuild = skillBuild(build, mission);
   a.weaponFx = [];
   a.weaponCharges = a.skillCampaign && (a.aircraft === "swift" && a.skillBuild[1] === 3 || a.aircraft === "heavy" && a.skillBuild[2] === 3) ? 2 : 1;
@@ -200,7 +367,8 @@ __name(lineDistance, "lineDistance");
 var circleHit = /* @__PURE__ */ __name((e, x, y, r) => e.hp > 0 && Math.hypot(e.x - x, e.y - y) <= r + (e.r || 0), "circleHit");
 function radial(a, targets, hit, x, y, r, damage, kind) {
   for (const e of targets) if (circleHit(e, x, y, r)) hit(e, damage);
-  addFx(a, { kind, x, y, r, remaining: 0.28, total: 0.28 });
+  const duration = ["impact", "shock"].includes(kind) ? 0.55 : 0.28;
+  addFx(a, { kind, x, y, r, remaining: duration, total: duration });
 }
 __name(radial, "radial");
 function clearCircle(bullets, x, y, r) {
@@ -262,7 +430,9 @@ function releaseBeam(a, p, targets, hit, bullets) {
   let n = 0;
   for (const e of [...targets].sort((a2, b) => b.y - a2.y)) {
     if (e.hp > 0 && e.y <= beam.y0 + (e.r || 0) && e.y >= beam.y1 - (e.r || 0) && Math.abs(e.x - p.x) <= beam.width + (e.r || 0)) {
-      hit(e, damage * (1 + (f >= 2 ? Math.min(n * 0.1, 0.3) : 0)));
+      const boost = f >= 2 ? Math.min(n * 10, 30) : 0;
+      hit(e, damage * (1 + boost / 100));
+      if (f >= 2) addFx(a, { kind: "beamBoost", x: e.x, y: e.y, r: e.r || 20, boost, remaining: 0.9, total: 0.9 });
       n++;
     }
   }
@@ -417,7 +587,7 @@ function stepSkillMissile(a, missile, dt, targets, hit) {
   if (e && Math.hypot(missile.x - e.x, missile.y - e.y) < (e.r || 0) + 10) {
     const volley = volleys.get(a)?.get(missile.weaponVolley), count = (volley?.counts.get(e) || 0) + 1;
     volley?.counts.set(e, count);
-    const amount = missile.damage * (f === 3 ? 1 + Math.min((count - 1) * 0.1, 0.6) : 1);
+    const amount = missile.damage * (f === 3 ? 1 + Math.min((count - 1) * 0.1, 0.6) : 1) * (missile.rehunts > 0 ? 0.5 : 1);
     hit(e, amount);
     if (f === 3 && count > 1) {
       let fx = volley?.boosts.get(e);
@@ -556,7 +726,7 @@ var SupportDamage = class {
 };
 
 // src/combat.mjs
-var clamp = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
+var clamp2 = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
 var CoopCombat = class {
   static {
     __name(this, "CoopCombat");
@@ -631,7 +801,7 @@ var CoopCombat = class {
     if (data.target && (!Number.isFinite(data.target.x) || !Number.isFinite(data.target.y))) return false;
     p.seq = data.seq;
     p.lastInput = now;
-    p.input = { x: data.x, y: data.y, target: data.target ? { x: clamp(data.target.x, 28, 452), y: clamp(data.target.y, 175, 655) } : null };
+    p.input = { x: data.x, y: data.y, target: data.target ? { x: clamp2(data.target.x, 28, 452), y: clamp2(data.target.y, 175, 655) } : null };
     if (this.state === "playing" && this.intro <= 0) {
       if (data.missile === true && startWeapon(p, p, p.aircraft, p.input, () => this.launch(p, 8, false))) this.event("missile", { slot });
       if (data.support === true && p.energy >= 100 && this.res <= 0 && this.burst <= 0) {
@@ -656,7 +826,7 @@ var CoopCombat = class {
   }
   damage(e, amount, owner) {
     if (e.hp <= 0 || this.state !== "playing") return;
-    e.hp = Math.max(0, e.hp - amount * (this.res > 0 ? supportRules(this).vulnerability : 1));
+    e.hp = Math.max(0, e.hp - amount * (this.res > 0 ? supportRules(this).vulnerability : 1) * testDamageMultiplier(this, e));
     if (e.hp === 0) {
       const p = this.players[owner], points = e.type === "boss" ? 5e3 : e.type === "elite" ? 300 : 100;
       this.score += points;
@@ -741,11 +911,11 @@ var CoopCombat = class {
       return;
     }
     this.time += dt;
-    if (this.stageTime >= 190) {
+    if (this.campaign !== "skytest" && this.stageTime >= 190) {
       this.finish(false);
       return;
     }
-    this.phase = this.stageTime < 65 ? 0 : this.stageTime < 130 ? 1 : 2;
+    if (this.campaign !== "skytest") this.phase = this.stageTime < 65 ? 0 : this.stageTime < 130 ? 1 : 2;
     const rules = supportRules(this), active = this.res > 0, resStep = Math.min(dt, this.res), movementTime = dt + resStep * (rules.move - 1), bulletStep = dt - resStep * (1 - rules.bullet), enemyStep = dt + resStep * (rules.enemyMove - 1);
     this.burst = Math.max(0, this.burst - dt);
     if (this.res > 0) {
@@ -788,8 +958,8 @@ var CoopCombat = class {
           p.y += dy / d * movement;
         }
       }
-      p.x = clamp(p.x, 28, 452);
-      p.y = clamp(p.y, 175, 655);
+      p.x = clamp2(p.x, 28, 452);
+      p.y = clamp2(p.y, 175, 655);
       p.ackSeq = p.seq;
       p.fire -= dt;
       if (p.fire <= 0) {
@@ -797,55 +967,59 @@ var CoopCombat = class {
         for (const shot of aircraftShots(p.aircraft, p.x, p.y)) this.shots.push({ id: this.nextId++, owner: p.slot, ...shot });
       }
     }
-    this.spawn -= dt;
-    if (this.spawn <= 0 && this.stageTime < 158) {
-      const elite = this.stageTime > 65 && this.random() < 0.27;
-      this.enemies.push({ id: this.nextId++, type: elite ? "elite" : "scout", x: 45 + this.random() * 390, y: -55, hp: elite ? 90 : 30, r: elite ? 25 : 17, speed: elite ? 48 : 80, age: 0, fire: 1.3, seed: this.random() * 6 });
-      this.spawn = this.boss ? 3.5 : this.stageTime < 65 ? 1.1 : 0.8;
-    }
-    if (this.stageTime >= 130 && !this.boss) {
-      this.boss = { id: this.nextId++, type: "boss", x: 240, y: -100, hp: 3e3, maxHp: 3e3, r: 60, age: 0, fire: 1.4 };
-      this.event("boss");
-    }
-    const live = this.players.filter((p) => p.hp > 0 && p.connected);
-    for (const e of this.enemies) {
-      const stopped = Math.min(dt, e.stun || 0), edt = dt ? enemyStep * (dt - stopped) / dt : 0;
-      e.stun = Math.max(0, (e.stun || 0) - dt);
-      e.age += edt;
-      e.y += e.speed * edt;
-      e.x = clamp(e.x + Math.sin(e.age * 1.7 + e.seed) * 35 * edt, 20, 460);
-      e.fire -= dt - stopped;
-      if (stopped < dt && e.fire <= 0 && e.y > 20 && live.length) {
-        const p = live[e.id % live.length], a = Math.atan2(p.y - e.y, p.x - e.x), n = e.type === "elite" ? 3 : 1;
-        for (let i = 0; i < n; i++) {
-          const angle = a + (i - (n - 1) / 2) * 0.18;
-          this.bullets.push({ id: this.nextId++, x: e.x, y: e.y + 15, vx: Math.cos(angle) * 145, vy: Math.sin(angle) * 145, r: 5 });
+    if (this.campaign === "skytest") stepTestMission(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
+    else {
+      this.spawn -= dt;
+      if (this.spawn <= 0 && this.stageTime < 158) {
+        const elite = this.stageTime > 65 && this.random() < 0.27;
+        this.enemies.push({ id: this.nextId++, type: elite ? "elite" : "scout", x: 45 + this.random() * 390, y: -55, hp: elite ? 90 : 30, r: elite ? 25 : 17, speed: elite ? 48 : 80, age: 0, fire: 1.3, seed: this.random() * 6 });
+        this.spawn = this.boss ? 3.5 : this.stageTime < 65 ? 1.1 : 0.8;
+      }
+      if (this.stageTime >= 130 && !this.boss) {
+        this.boss = { id: this.nextId++, type: "boss", x: 240, y: -100, hp: 3e3, maxHp: 3e3, r: 60, age: 0, fire: 1.4 };
+        this.event("boss");
+      }
+      const live2 = this.players.filter((p) => p.hp > 0 && p.connected);
+      for (const e of this.enemies) {
+        const stopped = Math.min(dt, e.stun || 0), edt = dt ? enemyStep * (dt - stopped) / dt : 0;
+        e.stun = Math.max(0, (e.stun || 0) - dt);
+        e.age += edt;
+        e.y += e.speed * edt;
+        e.x = clamp2(e.x + Math.sin(e.age * 1.7 + e.seed) * 35 * edt, 20, 460);
+        e.fire -= dt - stopped;
+        if (stopped < dt && e.fire <= 0 && e.y > 20 && live2.length) {
+          const p = live2[e.id % live2.length], a = Math.atan2(p.y - e.y, p.x - e.x), n = e.type === "elite" ? 3 : 1;
+          for (let i = 0; i < n; i++) {
+            const angle = a + (i - (n - 1) / 2) * 0.18;
+            this.bullets.push({ id: this.nextId++, x: e.x, y: e.y + 15, vx: Math.cos(angle) * 145, vy: Math.sin(angle) * 145, r: 5 });
+          }
+          e.fire = e.type === "elite" ? 1.4 : 2.1;
         }
-        e.fire = e.type === "elite" ? 1.4 : 2.1;
-      }
-      for (const p of live) if (e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 6) {
-        this.hit(p, "collision");
-        e.y = 880;
-      }
-    }
-    const b = this.boss;
-    if (b?.hp > 0) {
-      const stopped = Math.min(dt, b.stun || 0), bdt = dt ? enemyStep * (dt - stopped) / dt : 0;
-      b.stun = Math.max(0, (b.stun || 0) - dt);
-      b.age += bdt;
-      b.y = Math.min(155, b.y + 65 * bdt);
-      b.x = 240 + Math.sin(b.age * 0.7) * 110;
-      b.fire -= dt - stopped;
-      if (stopped < dt && b.fire <= 0 && b.y > 70) {
-        const n = b.hp < 1500 ? 13 : 9;
-        for (let i = 0; i < n; i++) {
-          const a = 0.2 + i * (Math.PI - 0.4) / (n - 1);
-          this.bullets.push({ id: this.nextId++, x: b.x, y: b.y + 25, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, r: 5 });
+        for (const p of live2) if (e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) < e.r + 6) {
+          this.hit(p, "collision");
+          e.y = 880;
         }
-        b.fire = b.hp < 1500 ? 0.85 : 1.25;
       }
-      for (const p of live) if (Math.hypot(b.x - p.x, b.y - p.y) < 60) this.hit(p, "collision");
+      const b2 = this.boss;
+      if (b2?.hp > 0) {
+        const stopped = Math.min(dt, b2.stun || 0), bdt = dt ? enemyStep * (dt - stopped) / dt : 0;
+        b2.stun = Math.max(0, (b2.stun || 0) - dt);
+        b2.age += bdt;
+        b2.y = Math.min(155, b2.y + 65 * bdt);
+        b2.x = 240 + Math.sin(b2.age * 0.7) * 110;
+        b2.fire -= dt - stopped;
+        if (stopped < dt && b2.fire <= 0 && b2.y > 70) {
+          const n = b2.hp < 1500 ? 13 : 9;
+          for (let i = 0; i < n; i++) {
+            const a = 0.2 + i * (Math.PI - 0.4) / (n - 1);
+            this.bullets.push({ id: this.nextId++, x: b2.x, y: b2.y + 25, vx: Math.cos(a) * 130, vy: Math.sin(a) * 130, r: 5 });
+          }
+          b2.fire = b2.hp < 1500 ? 0.85 : 1.25;
+        }
+        for (const p of live2) if (Math.hypot(b2.x - p.x, b2.y - p.y) < 60) this.hit(p, "collision");
+      }
     }
+    const live = this.players.filter((p) => p.hp > 0 && p.connected), b = this.boss;
     const targets = [...this.enemies, ...b ? [b] : []];
     for (const s of this.shots) {
       s.x += s.vx * dt;
@@ -897,7 +1071,7 @@ var CoopCombat = class {
     this.enemies = this.enemies.filter((e) => e.hp > 0 && e.y < 870);
   }
   snapshot() {
-    return { campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e })), boss: this.boss ? { ...this.boss } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
+    return { campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, testWarnings: this.testWarnings || [], supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e })), boss: this.boss ? { ...this.boss } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
   }
 };
 
@@ -975,7 +1149,7 @@ var BattleRoom = class {
     if (this.result) return;
     this.phase = "result";
     this.finishedAt = now;
-    this.result = { matchId: this.id, campaign: this.game.campaign, win: this.game.win, total: this.game.score, players: this.game.players.map((p) => ({ id: p.id, name: p.name, score: p.score, kills: p.kills })), duration: this.game.time, completedAt: now, eligible: reason === "completed" && this.started && !this.soloContinued && this.online.every(Boolean), reason: this.soloContinued ? "solo-continued" : reason };
+    this.result = { matchId: this.id, campaign: this.game.campaign, win: this.game.win, total: this.game.score, players: this.game.players.map((p) => ({ id: p.id, name: p.name, score: p.score, kills: p.kills })), duration: this.game.time, completedAt: now, eligible: this.game.campaign !== "skytest" && reason === "completed" && this.started && !this.soloContinued && this.online.every(Boolean), reason: this.game.campaign === "skytest" ? "test-mission" : this.soloContinued ? "solo-continued" : reason };
   }
   advance(now) {
     if (this.phase === "reconnecting" && now >= this.deadline) {
@@ -1014,10 +1188,10 @@ function networkSnapshot(snapshot) {
   return { ...snapshot, world: {
     ...w,
     players: w.players.map((p) => pick(p, ["id", "name", "slot", "aircraft", "singer", "x", "y", "hp", "energy", "score", "kills", "invuln", "missileCd", "seq", "ackSeq", "connected", "shield", "shieldHitUntil", "skill", "skillCampaign", "skillBuild", "weaponFx", "weaponCharges", "weaponGap", "dashShield", "bulletImmune", "speedBoost"])),
-    enemies: w.enemies.map((e) => pick(e, ["id", "type", "x", "y", "hp", "r", "age", "seed", "stun"])),
-    boss: w.boss ? pick(w.boss, ["id", "type", "x", "y", "hp", "maxHp", "r", "age", "fire", "stun"]) : null,
+    enemies: w.enemies.map((e) => pick(e, ["id", "type", "testKind", "testProtected", "maxHp", "x", "y", "hp", "r", "age", "seed", "stun"])),
+    boss: w.boss ? pick(w.boss, ["id", "type", "testKind", "x", "y", "hp", "maxHp", "r", "age", "fire", "stun"]) : null,
     shots: w.shots.map((s) => pick(s, ["id", "owner", "x", "y", "vx", "vy", "critical", "super"])),
-    bullets: w.bullets.map((s) => pick(s, ["id", "x", "y", "vx", "vy", "r"])),
+    bullets: w.bullets.map((s) => pick(s, ["id", "x", "y", "vx", "vy", "r", "testBullet"])),
     missiles: w.missiles.map((m) => pick(m, ["id", "owner", "x", "y", "vx", "vy", "life", "age", "super"]))
   } };
 }
@@ -1098,7 +1272,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, mission01Test: true, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -1129,14 +1303,14 @@ var worker_default = { async fetch(request, env) {
     if (raw.length > 4096) return response({ error: "Too large" }, 413);
     const data = env.SITE_PUBLIC_KEY ? await verifyRoom(env.SITE_PUBLIC_KEY, raw, request.headers.get("X-Battle-Signature")) : await verify(env.BATTLE_SECRET, raw, request.headers.get("X-Battle-Signature"));
     if (!data || data.aud !== "sky-room-create" || !rosterValid(data.players) || typeof data.matchId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.matchId)) return response({ error: "Unauthorized" }, 401);
-    if (!data.players.every((p) => skillBuildReady(p.build, data.players[0].mission))) return response({ error: "\u751F\u5B58\u4E4B\u9053\u9700\u6240\u6709\u73A9\u5BB6\u7528\u5B8C 3 \u9EDE\u5F37\u5316\u9EDE\u6578\u624D\u80FD\u51FA\u64CA\u3002" }, 409);
+    if (!data.players.every((p) => skillBuildReady(p.build, data.players[0].mission))) return response({ error: "\u751F\u5B58\u4E4B\u9053\uFF0F\u6E2C\u8A66\u95DC\u5361\u9700\u6240\u6709\u73A9\u5BB6\u7528\u5B8C 3 \u9EDE\u5F37\u5316\u9EDE\u6578\u624D\u80FD\u51FA\u64CA\u3002" }, 409);
     const gate = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName("__admission"));
-    const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
+    const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: data.players[0].mission === "skytest" ? 24 * 60 * 6e4 : data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
     if (!admitted.ok) return admitted;
     const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: roomLocationHint(env) });
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
-    return response({ lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
+    return response({ mission01Test: true, lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
   }
   if (url.pathname.startsWith("/room/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -1349,7 +1523,7 @@ var BattleService = class extends DurableObject {
     this.timer = setInterval(() => {
       const now = Date.now();
       if (!this.room) return;
-      if (this.room.phase === "loading" && now - this.created > 6e4 || now - this.created > (this.room.game.campaign === "survival" ? 9 : 5) * 6e4) {
+      if (this.room.phase === "loading" && now - this.created > 6e4 || this.room.game.campaign !== "skytest" && now - this.created > (this.room.game.campaign === "survival" ? 9 : 5) * 6e4) {
         this.room.game.finish(false);
         this.room.complete(now, "timeout");
       }
