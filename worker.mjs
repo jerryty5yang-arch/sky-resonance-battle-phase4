@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 37;
+var BACKEND_VERSION = 40;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -260,7 +260,7 @@ function startSkillWeapon(a, p, input, launch, ctx = {}) {
 }
 __name(startSkillWeapon, "startSkillWeapon");
 function releaseBeam(a, p, targets, hit, bullets) {
-  const [f, m, t] = levels(a), charged = f === 3 && !a.skill.queued, scale = charged ? 1.3 : 1, damage = (f ? 200 : 180) * (charged ? 1.5 : 1);
+  const [f, m, t] = levels(a), charged = f === 3 && !a.skill.queued, scale = charged ? 1.3 : 1, damage = (f >= 2 ? 250 : f ? 200 : 180) * (charged ? 1.5 : 1);
   const beam = { kind: "beam", remaining: 0.32, total: 0.32, x0: p.x, y0: p.y - 24, x1: p.x, y1: Math.max(-100, p.y - 674), width: 22 * scale, widthScale: scale, flame: charged };
   a.skill = beam;
   let n = 0;
@@ -301,8 +301,8 @@ function stepSkillWeapon(a, p, dt, targets, hit, bullets = []) {
     if (fx.kind === "residual") clearLine(bullets, fx, fx.width);
     fx.remaining = Math.max(0, fx.remaining - dt);
     if (fx.kind === "mine" && fx.remaining === 0) {
-      for (let i = 0; i < 6; i++) {
-        const angle = -Math.PI / 2 + i * Math.PI / 3, s2 = { x0: fx.x, y0: fx.y, x1: fx.x + Math.cos(angle) * 2e3, y1: fx.y + Math.sin(angle) * 2e3 };
+      for (let i = 0; i < 12; i++) {
+        const angle = -Math.PI / 2 + i * Math.PI / 6, s2 = { x0: fx.x, y0: fx.y, x1: fx.x + Math.cos(angle) * 2e3, y1: fx.y + Math.sin(angle) * 2e3 };
         for (const e of targets) if (e.hp > 0 && lineDistance(e, s2) <= 12 + (e.r || 0)) hit(e, 30);
         addFx(a, { ...s2, kind: "mineBeam", remaining: 0.32, total: 0.32, width: 12 });
       }
@@ -360,7 +360,7 @@ function skillMovementSpeed(a, base) {
 __name(skillMovementSpeed, "skillMovementSpeed");
 function skillIncomingDamage(a, amount, source) {
   if (source === "bullet" && a.bulletImmune > 0) return 0;
-  return a.skillCampaign && a.aircraft === "heavy" && levels(a)[2] >= 1 && a.skill?.kind === "charge" ? amount * 0.7 : amount;
+  return a.skillCampaign && a.aircraft === "heavy" && levels(a)[2] >= 1 && a.skill?.kind === "charge" ? amount * 0.5 : amount;
 }
 __name(skillIncomingDamage, "skillIncomingDamage");
 function skillShieldAvailable(a) {
@@ -632,7 +632,7 @@ __name(stepTestBoss, "stepTestBoss");
 var clamp2 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
 var RIFT_ENEMIES = Object.freeze({
   E13: { name: "\u661F\u5C51\u5075\u5BDF\u6A5F", hp: 55, speed: 175, r: 18, type: "scout", interval: 1.8 },
-  E14: { name: "\u76F8\u4F4D\u6514\u622A\u6A5F", hp: 95, speed: 255, r: 20, type: "scout", interval: 2.4 },
+  E14: { name: "\u76F8\u4F4D\u6514\u622A\u6A5F", hp: 48, speed: 175, r: 20, type: "scout", interval: 2.4 },
   E15: { name: "\u661F\u74B0\u91CD\u7532\u6A5F", hp: 420, speed: 70, r: 29, type: "elite", interval: 3 },
   E16: { name: "\u65CB\u74B0\u7832\u53F0", hp: 250, speed: 0, r: 26, type: "elite", interval: 3.2 },
   E17: { name: "\u5171\u632F\u652F\u63F4\u6A5F", hp: 135, speed: 95, r: 22, type: "scout", interval: 2.5 },
@@ -1060,7 +1060,7 @@ __name(startEXStageTwo, "startEXStageTwo");
 var clamp3 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
 var DESERT_ENEMIES = Object.freeze({
   E07: { name: "\u7802\u71D5\u5075\u5BDF\u6A5F", hp: 45, speed: 125, r: 18, type: "scout", interval: 2.8 },
-  E08: { name: "\u8D64\u880D\u6514\u622A\u6A5F", hp: 85, speed: 175, r: 20, type: "scout", interval: 2.6 },
+  E08: { name: "\u8D64\u880D\u6514\u622A\u6A5F", hp: 48, speed: 175, r: 20, type: "scout", interval: 2.6 },
   E09: { name: "\u7802\u5CA9\u91CD\u7532\u6A5F", hp: 360, speed: 75, r: 29, type: "elite", interval: 2.8 },
   E10: { name: "\u907A\u8DE1\u5B88\u885B\u7832\u53F0", hp: 220, speed: 0, r: 27, type: "elite", interval: 3.8 },
   E11: { name: "\u53E4\u4EE3\u80FD\u6E90\u652F\u63F4\u6A5F", hp: 120, speed: 90, r: 22, type: "scout", interval: 4 },
@@ -2241,7 +2241,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -2279,7 +2279,7 @@ var worker_default = { async fetch(request, env) {
     const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: roomLocationHint(env) });
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
-    return response({ enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
+    return response({ mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
   }
   if (url.pathname.startsWith("/room/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
