@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 41;
+var BACKEND_VERSION = 43;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -94,11 +94,11 @@ function validSkillBuild(value) {
 }
 __name(validSkillBuild, "validSkillBuild");
 function skillBuild(value, mission) {
-  return ["survival", "skytest", "deserttest", "riftex", "survivalex"].includes(mission) && validSkillBuild(value) ? [...value] : [0, 0, 0];
+  return ["survival", "skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(mission) && validSkillBuild(value) ? [...value] : [0, 0, 0];
 }
 __name(skillBuild, "skillBuild");
 function skillBuildReady(value, mission) {
-  return !["survival", "skytest", "deserttest", "riftex", "survivalex"].includes(mission) || validSkillBuild(value) && value.reduce((a, b) => a + b, 0) === 3;
+  return !["survival", "skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(mission) || validSkillBuild(value) && value.reduce((a, b) => a + b, 0) === 3;
 }
 __name(skillBuildReady, "skillBuildReady");
 
@@ -120,7 +120,7 @@ function criticalDamage(amount, enabled, random) {
 __name(criticalDamage, "criticalDamage");
 
 // ../dist/missions.js
-var MISSIONS = Object.freeze({ riftex: { id: "riftex", name: "\u661F\u74B0\u88C2\u9699-EX", phase: "MISSION 03 / EX", storm: "\u661F\u74B0\u88C2\u9699\u8B66\u5831" }, survivalex: { id: "survivalex", name: "\u751F\u5B58\u4E4B\u9053-EX", phase: "SURVIVAL EX / STAGE 01", storm: "EX\u9023\u7E8C\u4F5C\u6230" }, deserttest: { id: "deserttest", name: "\u8D64\u7802\u907A\u8DE1-EX", phase: "MISSION 02 / EX", storm: "\u907A\u8DE1\u555F\u52D5\u8B66\u5831" }, skytest: { id: "skytest", name: "\u96F2\u6D77\u9632\u885B\u6230-EX", phase: "MISSION 01 / EX", storm: "\u6575\u8ECD\u8B66\u5831" }, survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
+var MISSIONS = Object.freeze({ frozenex: { id: "frozenex", name: "\u51B0\u5C01\u8981\u585E-EX", phase: "MISSION 04 / EX", storm: "\u6975\u5BD2\u8981\u585E\u8B66\u5831" }, riftex: { id: "riftex", name: "\u661F\u74B0\u88C2\u9699-EX", phase: "MISSION 03 / EX", storm: "\u661F\u74B0\u88C2\u9699\u8B66\u5831" }, survivalex: { id: "survivalex", name: "\u751F\u5B58\u4E4B\u9053-EX", phase: "SURVIVAL EX / STAGE 01", storm: "EX\u9023\u7E8C\u4F5C\u6230" }, deserttest: { id: "deserttest", name: "\u8D64\u7802\u907A\u8DE1-EX", phase: "MISSION 02 / EX", storm: "\u907A\u8DE1\u555F\u52D5\u8B66\u5831" }, skytest: { id: "skytest", name: "\u96F2\u6D77\u9632\u885B\u6230-EX", phase: "MISSION 01 / EX", storm: "\u6575\u8ECD\u8B66\u5831" }, survival: { id: "survival", name: "\u751F\u5B58\u4E4B\u9053", phase: "SURVIVAL ROUTE", storm: "\u9023\u7E8C\u4F5C\u6230" }, sky: { id: "sky", name: "\u96F2\u6D77\u9632\u885B\u6230", phase: "BLUE HORIZON", storm: "\u7D2B\u8272\u98A8\u66B4" }, desert: { id: "desert", name: "\u8D64\u7802\u907A\u8DE1", phase: "SCARLET WASTELAND", storm: "\u8D64\u7802\u98A8\u66B4" } });
 var validMission = /* @__PURE__ */ __name((id) => typeof id === "string" && Object.hasOwn(MISSIONS, id), "validMission");
 var missionRules = /* @__PURE__ */ __name((id) => MISSIONS[validMission(id) ? id : "sky"], "missionRules");
 
@@ -159,7 +159,7 @@ __name(nearestEnemy, "nearestEnemy");
 // ../dist/weapon-skills.js
 var volleys = /* @__PURE__ */ new WeakMap();
 function configureSkills(a, mission, build) {
-  a.skillCampaign = ["survival", "skytest", "deserttest", "riftex", "survivalex"].includes(mission);
+  a.skillCampaign = ["survival", "skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(mission);
   a.skillBuild = skillBuild(build, mission);
   a.weaponFx = [];
   a.weaponCharges = a.skillCampaign && (a.aircraft === "swift" && a.skillBuild[1] === 3 || a.aircraft === "heavy" && a.skillBuild[2] === 3) ? 2 : 1;
@@ -543,7 +543,7 @@ function updateLaser(g, b, clock) {
   }
 }
 __name(updateLaser, "updateLaser");
-function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet4) {
+function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet5) {
   const b = g.boss;
   if (!b || b.hp <= 0) return;
   const stopped = Math.min(dt, b.stun || 0), clock = dt - stopped, edt = dt ? enemyDt * clock / dt : 0;
@@ -586,7 +586,7 @@ function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet4) {
         for (let i = 0; i < n; i++) {
           const offset = (i - (n - 1) / 2) * spread;
           if (b.stage === 2 && Math.abs(offset) < 0.15) continue;
-          bullet4(g, p.x, p.y + 8, p.aim + offset, b.stage === 2 ? 140 : 125);
+          bullet5(g, p.x, p.y + 8, p.aim + offset, b.stage === 2 ? 140 : 125);
         }
         p.muzzleUntil = g.time + 0.18;
       }
@@ -628,8 +628,288 @@ function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet4) {
 }
 __name(stepTestBoss, "stepTestBoss");
 
-// ../dist/rift-ex.js
+// ../dist/frozen-ex.js
 var clamp2 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
+var FROZEN_ENEMIES = Object.freeze({
+  E19: { name: "\u51B0\u7FBD\u5075\u5BDF\u6A5F", hp: 60, speed: 150, r: 18, type: "scout", interval: 2.2 },
+  E20: { name: "\u971C\u5203\u6514\u622A\u6A5F", hp: 48, speed: 175, r: 20, type: "scout", interval: 2.7 },
+  E21: { name: "\u51B0\u5CA9\u91CD\u88DD\u6A5F", hp: 520, speed: 65, r: 29, type: "elite", interval: 3.5 },
+  E22: { name: "\u6975\u5BD2\u5B88\u885B\u7832\u53F0", hp: 280, speed: 0, r: 26, type: "elite", interval: 3.8 },
+  E23: { name: "\u51B0\u6838\u652F\u63F4\u6A5F", hp: 150, speed: 85, r: 22, type: "scout", interval: 3 },
+  E24: { name: "\u66B4\u96EA\u7A81\u8972\u6A5F", hp: 120, speed: 205, r: 21, type: "scout", interval: 3.5 },
+  EX04: { name: "\u971C\u93A7\u57F7\u884C\u8005", hp: 1700, speed: 75, r: 38, type: "elite", interval: 3.8 }
+});
+var windows = [[5, 14, "E19", 8], [18, 28, "E19", 9], [30, 41, "E20", 4], [33, 43, "E19", 4], [45, 57, "E21", 2], [49, 59, "E19", 4], [60, 72, "E22", 2], [75, 80, "E23", 2], [77, 88, "E19", 6], [90, 98, "E24", 3], [100, 100, "EX04", 1], [104, 114, "E19", 4], [120, 127, "E21", 2], [125, 133, "E20", 3]];
+var FROZEN_WAVES = windows.flatMap(([start, end, kind, n]) => Array.from({ length: n }, (_, i) => ({ kind, index: i, time: start + (end - start) * i / Math.max(1, n - 1) }))).sort((a, b) => a.time - b.time);
+function spawnFrozenEnemy(g, kind, index = 0) {
+  const s = FROZEN_ENEMIES[kind], hp = Math.round(s.hp * (g.players ? 1.5 : 1)), side = index % 2 ? 1 : -1, x = kind === "E22" || kind === "E20" || kind === "E24" ? side < 0 ? 65 : 415 : 95 + index % 4 * 95;
+  const e = { ...s, id: testId(g), testKind: kind, hp, maxHp: hp, x, y: -65, startX: x, side, age: 0, seed: index * 0.7, holdY: 130 + index % 3 * 55, fire: 2, cycle: 0, charge: 0, dashPhase: "approach" };
+  g.enemies.push(e);
+  return e;
+}
+__name(spawnFrozenEnemy, "spawnFrozenEnemy");
+function bullet(g, x, y, a, speed = 125, split = false) {
+  if (g.bullets.filter((b2) => !b2.dead).length >= 320) return;
+  const b = { id: testId(g), x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: split ? 7 : 5, testBullet: "frozen", ...split ? { splitIn: 1.6, splitAngle: a } : {} };
+  g.bullets.push(b);
+  return b;
+}
+__name(bullet, "bullet");
+function fan(g, e, p, n = 3, spread = 0.25, split = false) {
+  const a = Math.atan2(p.y - e.y, p.x - e.x);
+  for (let i = 0; i < n; i++) bullet(g, e.x, e.y + 10, a + (i - (n - 1) / 2) * spread, split ? 90 : 125, split);
+  e.muzzleUntil = g.time + 0.18;
+}
+__name(fan, "fan");
+function ring(g, e, p, n = 12, turn = 0, split = false) {
+  const safe = Math.atan2(p.y - e.y, p.x - e.x);
+  for (let i = 0; i < n; i++) {
+    const a = turn + i * Math.PI * 2 / n;
+    if (Math.abs(Math.atan2(Math.sin(a - safe), Math.cos(a - safe))) < 0.32) continue;
+    bullet(g, e.x, e.y, a, split ? 85 : 105, split);
+  }
+  e.muzzleUntil = g.time + 0.18;
+}
+__name(ring, "ring");
+function stepFrozenCrystals(g, dt, live) {
+  const parents = [...g.bullets];
+  for (const b of parents) {
+    if (b.dead || !Number.isFinite(b.splitIn)) continue;
+    b.splitIn -= dt;
+    if (b.splitIn <= 0.65) {
+      b.splitWarning = true;
+      for (const d of [-0.42, 0.42]) {
+        const a = b.splitAngle + d;
+        g.testWarnings.push({ kind: "ice-split", x0: b.x, y0: b.y, x1: b.x + Math.cos(a) * 65, y1: b.y + Math.sin(a) * 65 });
+      }
+    }
+    if (b.splitIn > 0) continue;
+    if (live.some((p) => Math.hypot(p.x - b.x, p.y - b.y) < 100)) {
+      b.splitIn = 0.1;
+      continue;
+    }
+    b.dead = true;
+    for (const d of [-0.42, 0.42]) bullet(g, b.x, b.y, b.splitAngle + d, 115, false);
+  }
+}
+__name(stepFrozenCrystals, "stepFrozenCrystals");
+function part(g, kind, side, hp) {
+  hp = Math.round(hp * (g.players ? 1.5 : 1));
+  return { id: testId(g), type: "elite", testKind: kind, side, x: 240 + side * 125, y: -100, r: kind === "F_NODE" ? 23 : 27, hp, maxHp: hp, age: 0, aim: Math.PI / 2, stun: 0 };
+}
+__name(part, "part");
+function makeFrozenBoss(g) {
+  const hp = g.players ? 11050 : 6500;
+  return { id: testId(g), type: "boss", testKind: "F_BOSS", name: "\u96F6\u5EA6\u51B0\u7687", x: 240, y: -100, r: 48, hp, maxHp: hp, age: 0, stage: 1, attack: "volley", attackTime: 3.6, fire: 1.2, sideIndex: 0, crystalFire: 2, summon: 16, weakTime: 0, parts: [part(g, "F_GUN", -1, 700), part(g, "F_GUN", 1, 700), part(g, "F_NODE", 0, 450)] };
+}
+__name(makeFrozenBoss, "makeFrozenBoss");
+function warnBeam(g, b) {
+  const l = b.laser;
+  g.testWarnings.push({ x0: l.x0, y0: l.y0, x1: l.x0 + Math.cos(l.start) * 850, y1: l.y0 + Math.sin(l.start) * 850, kind: "frozen-laser" });
+}
+__name(warnBeam, "warnBeam");
+function stepFrozenBoss(g, dt, enemyDt, live, onHit, emit) {
+  const b = g.boss;
+  if (!b || b.hp <= 0) return;
+  const stopped = Math.min(dt, b.stun || 0), clock = dt - stopped, edt = dt ? enemyDt * clock / dt : 0;
+  b.stun = Math.max(0, (b.stun || 0) - dt);
+  b.age += edt;
+  b.y = Math.min(150, b.y + 60 * edt);
+  if (!["warning", "laser"].includes(b.attack)) b.x += (240 + Math.sin(b.age * 0.3) * 24 - b.x) * Math.min(1, edt * 2);
+  for (const p of b.parts) {
+    p.x = b.x + p.side * 125;
+    p.y = b.y + (p.testKind === "F_NODE" ? -100 : 12);
+    p.age = b.age;
+    p.stun = Math.max(0, (p.stun || 0) - dt);
+  }
+  if (b.y < 150 || !live.length) return;
+  const target = live[Math.floor(b.age / 7) % live.length];
+  if (b.stage === 1 && b.hp <= b.maxHp * 0.5) {
+    clearLaser(g, b);
+    b.stage = 2;
+    b.attack = "weak";
+    b.attackTime = 3.2;
+    g.bullets = [];
+    emit("boss-phase");
+  }
+  b.weakTime = b.attack === "weak" ? b.attackTime : 0;
+  b.r = b.weakTime ? 60 : 48;
+  b.openSoon = ["warning", "laser"].includes(b.attack) ? b.attackTime : 0;
+  if (clock === 0 && dt > 0) {
+    if (b.attack === "warning") warnBeam(g, b);
+    return;
+  }
+  if (b.beam) updateLaser(g, b, clock);
+  if (b.attack === "volley") {
+    b.fire -= clock;
+    b.crystalFire -= clock;
+    const gun = b.parts[b.sideIndex % 2];
+    if (gun.hp > 0) {
+      gun.charge = clamp2(1 - b.fire / 0.8, 0, 1);
+      gun.aim = Math.atan2(target.y - gun.y, target.x - gun.x);
+    }
+    if (b.fire <= 0) {
+      if (gun.hp > 0 && gun.stun <= 0) fan(g, gun, target, b.stage === 2 ? 5 : 3, 0.28, false);
+      b.sideIndex++;
+      b.fire = 1.5;
+    }
+    if (b.crystalFire <= 0 && b.parts[2].hp > 0 && b.parts[2].stun <= 0) {
+      if (b.stage === 2) ring(g, b, target, 10, b.age * 0.14, true);
+      else fan(g, b, target, 3, 0.55, true);
+      b.crystalFire = 5;
+    }
+  }
+  if (b.attack === "warning") warnBeam(g, b);
+  b.attackTime = Math.max(0, b.attackTime - clock);
+  if (b.attackTime === 0) {
+    if (b.attack === "volley") {
+      const gun = b.parts.filter((p) => p.testKind === "F_GUN" && p.hp > 0 && p.stun <= 0)[b.sideIndex % Math.max(1, b.parts.filter((p) => p.testKind === "F_GUN" && p.hp > 0 && p.stun <= 0).length)];
+      if (!gun) {
+        b.attack = "weak";
+        b.attackTime = 3.2;
+      } else {
+        const a = clamp2(Math.atan2(target.y - gun.y, target.x - gun.x), 0.5, Math.PI - 0.5);
+        b.laser = { x0: gun.x, y0: gun.y + 10, start: a, end: a, length: 850, tone: "frozen", sourceId: gun.id };
+        b.attack = "warning";
+        b.attackTime = 1.2;
+      }
+    } else if (b.attack === "warning") {
+      const source = b.parts.find((p) => p.id === b.laser.sourceId);
+      if (!source || source.hp <= 0) {
+        b.attack = "weak";
+        b.attackTime = 3.2;
+      } else {
+        startLaser(g, b);
+        b.attackTime = 1.2;
+        b.beam.total = 1.2;
+      }
+    } else if (b.attack === "laser") {
+      clearLaser(g, b);
+      b.attack = "weak";
+      b.attackTime = 3.2;
+    } else {
+      b.attack = "volley";
+      b.attackTime = 3.6;
+      b.fire = 1.2;
+      b.crystalFire = 2;
+      b.weakTime = 0;
+      b.r = 48;
+    }
+  }
+  if (["warning", "laser"].includes(b.attack) && b.parts.find((p) => p.id === b.laser?.sourceId)?.hp <= 0) {
+    clearLaser(g, b);
+    b.attack = "weak";
+    b.attackTime = 3.2;
+    b.openSoon = 0;
+  }
+  b.summon -= clock;
+  if (b.summon <= 0 && b.attack === "weak" && g.enemies.filter((e) => e.hp > 0).length <= (g.players ? 12 : 9)) {
+    for (let i = 0; i < 3; i++) spawnFrozenEnemy(g, "E19", i);
+    b.summon = b.parts[2].hp > 0 ? 18 : 30;
+  }
+  for (const p of live) {
+    if (Math.hypot(b.x - p.x, b.y - p.y) < b.r + 6) onHit(p, "collision");
+    for (const a of b.parts) if (a.hp > 0 && Math.hypot(a.x - p.x, a.y - p.y) < a.r + 6) onHit(p, "collision");
+  }
+}
+__name(stepFrozenBoss, "stepFrozenBoss");
+function stepFrozenEX(g, dt, enemyDt, players, onHit, emit) {
+  g.testWarnings = [];
+  g.testWaveIndex ??= 0;
+  const live = players.filter((p) => p.hp > 0 && p.connected !== false), cap = g.players ? 16 : 12;
+  stepFrozenCrystals(g, dt, live);
+  while (g.stageTime < 135 && g.testWaveIndex < FROZEN_WAVES.length && FROZEN_WAVES[g.testWaveIndex].time <= g.stageTime) {
+    if (g.enemies.filter((e) => e.hp > 0).length >= cap) break;
+    const w = FROZEN_WAVES[g.testWaveIndex++];
+    spawnFrozenEnemy(g, w.kind, w.index);
+  }
+  if (g.stageTime >= 135 && g.phase === 0) {
+    g.phase = 1;
+    emit("ice-warning");
+  }
+  if (g.stageTime >= 140 && g.phase < 2) {
+    g.phase = 2;
+    g.bullets = [];
+    emit("test-warning");
+  }
+  if (g.stageTime >= 150 && !g.boss) {
+    g.enemies = [];
+    g.bullets = [];
+    g.boss = makeFrozenBoss(g);
+    g.bossSpawned = true;
+    g.phase = 3;
+    emit("boss");
+  }
+  const support = g.enemies.filter((e) => e.hp > 0 && e.testKind === "E23"), linked = /* @__PURE__ */ new Set();
+  for (const s of support) {
+    s.links = g.enemies.filter((e) => e.hp > 0 && e.id !== s.id && e.testKind !== "E23" && Math.hypot(e.x - s.x, e.y - s.y) < 150).sort((a, b) => Math.hypot(a.x - s.x, a.y - s.y) - Math.hypot(b.x - s.x, b.y - s.y)).slice(0, 3).map((e) => e.id);
+    for (const id of s.links) linked.add(id);
+  }
+  for (const e of [...g.enemies]) {
+    if (e.hp <= 0) continue;
+    const stopped = Math.min(dt, e.stun || 0), clock = dt - stopped, edt = dt ? enemyDt * clock / dt : 0;
+    e.stun = Math.max(0, (e.stun || 0) - dt);
+    e.age += edt;
+    const ox = e.x, oy = e.y, target = live[e.id % Math.max(1, live.length)];
+    if (g.stageTime >= 140 && g.stageTime < 150) {
+      e.y -= 150 * dt;
+      continue;
+    }
+    if (["E21", "E22", "E23", "EX04"].includes(e.testKind)) {
+      e.y = Math.min(e.holdY, e.y + (e.speed || 85) * edt);
+      e.x = clamp2(e.startX + Math.sin(e.age * 0.5) * (e.testKind === "E22" ? 0 : 18), 40, 440);
+    } else if (e.testKind === "E24") {
+      if (e.dashPhase === "approach") {
+        e.y = Math.min(100, e.y + 100 * edt);
+        if (e.y >= 100 && target) {
+          e.dashPhase = "warning";
+          e.dashWarning = 0.9;
+          e.dashAngle = clamp2(Math.atan2(target.y - e.y, target.x - e.x), 0.5, Math.PI - 0.5);
+        }
+      } else if (e.dashPhase === "warning") {
+        e.dashWarning = Math.max(0, e.dashWarning - clock);
+        g.testWarnings.push({ kind: "ice-dash", x0: e.x, y0: e.y, x1: e.x + Math.cos(e.dashAngle) * 800, y1: e.y + Math.sin(e.dashAngle) * 800 });
+        if (e.dashWarning === 0) e.dashPhase = "dash";
+      } else {
+        e.x += Math.cos(e.dashAngle) * e.speed * edt;
+        e.y += Math.sin(e.dashAngle) * e.speed * edt;
+      }
+    } else {
+      e.y += e.speed * edt;
+      e.x = clamp2(e.startX + Math.sin(e.age * 1.2) * (e.testKind === "E20" ? 42 : 14), 25, 455);
+    }
+    if (dt) {
+      e.vx = (e.x - ox) / dt;
+      e.vy = (e.y - oy) / dt;
+    }
+    e.testHaste = linked.has(e.id);
+    e.fire -= clock * (e.testHaste ? 1 / 0.9 : 1);
+    e.charge = ["E21", "E22", "EX04"].includes(e.testKind) ? clamp2(1 - e.fire / 0.8, 0, 1) : 0;
+    if (e.testKind === "E22" && e.charge > 0 && target) {
+      e.aim ??= Math.atan2(target.y - e.y, target.x - e.x);
+      for (const d of [-0.36, 0.36]) g.testWarnings.push({ kind: "ice-turret", x0: e.x, y0: e.y, x1: e.x + Math.cos(e.aim + d) * 280, y1: e.y + Math.sin(e.aim + d) * 280 });
+    }
+    if (clock > 0 && e.fire <= 0 && e.y > 20 && e.y < 600 && target && (g.stageTime < 135 || g.boss) && e.dashPhase !== "warning") {
+      if (e.testKind === "E22") {
+        const a = e.aim ?? Math.atan2(target.y - e.y, target.x - e.x);
+        for (const d of [-0.36, 0.36]) bullet(g, e.x, e.y, a + d, 100, true);
+        e.aim = void 0;
+      } else if (e.testKind === "EX04") ring(g, e, target, 10, e.cycle++ * 0.25, true);
+      else fan(g, e, target, e.testKind === "E21" ? 3 : 1, e.testKind === "E21" ? 0.4 : 0.2, e.testKind === "E21" || e.testKind === "E23");
+      e.fire = e.interval;
+    }
+    for (const p of live) if (Math.hypot(e.x - p.x, e.y - p.y) < e.r + 6) {
+      onHit(p, "collision");
+      if (e.type !== "elite") e.y = 900;
+    }
+  }
+  g.enemies = g.enemies.filter((e) => e.hp > 0 && e.y > -320 && e.y < 870 && e.x > -250 && e.x < 730);
+  stepFrozenBoss(g, dt, enemyDt, live, onHit, emit);
+}
+__name(stepFrozenEX, "stepFrozenEX");
+
+// ../dist/rift-ex.js
+var clamp3 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
 var RIFT_ENEMIES = Object.freeze({
   E13: { name: "\u661F\u5C51\u5075\u5BDF\u6A5F", hp: 55, speed: 175, r: 18, type: "scout", interval: 1.8 },
   E14: { name: "\u76F8\u4F4D\u6514\u622A\u6A5F", hp: 48, speed: 175, r: 20, type: "scout", interval: 2.4 },
@@ -639,8 +919,8 @@ var RIFT_ENEMIES = Object.freeze({
   E18: { name: "\u88C2\u9699\u7A81\u8972\u6A5F", hp: 110, speed: 225, r: 21, type: "scout", interval: 3 },
   EX03: { name: "\u661F\u74B0\u88C1\u6C7A\u8005", hp: 1450, speed: 90, r: 38, type: "elite", interval: 3 }
 });
-var windows = [[5, 14, "E13", 8], [16, 29, "E13", 12], [30, 43, "E14", 4], [31, 44, "E13", 4], [45, 58, "E15", 2], [46, 59, "E13", 6], [60, 73, "E16", 2], [75, 80, "E17", 2], [76, 89, "E13", 8], [90, 98, "E18", 4], [100, 100, "EX03", 1], [101, 113, "E13", 4], [120, 130, "E15", 2], [121, 134, "E14", 4]];
-var RIFT_WAVES = windows.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
+var windows2 = [[5, 14, "E13", 8], [16, 29, "E13", 12], [30, 43, "E14", 4], [31, 44, "E13", 4], [45, 58, "E15", 2], [46, 59, "E13", 6], [60, 73, "E16", 2], [75, 80, "E17", 2], [76, 89, "E13", 8], [90, 98, "E18", 4], [100, 100, "EX03", 1], [101, 113, "E13", 4], [120, 130, "E15", 2], [121, 134, "E14", 4]];
+var RIFT_WAVES = windows2.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
   const group = kind === "E13", batch = Math.floor(i / 3), batches = Math.ceil(n / 3);
   return { kind, index: i, time: group ? start + (end - start) * batch / Math.max(1, batches - 1) : start + (end - start) * i / Math.max(1, n - 1), formation: group ? { shape: wave % 2 ? "column" : "arc", slot: i % 3, size: Math.min(3, n - batch * 3), lane: batch % 3 } : null };
 })).sort((a, b) => a.time - b.time);
@@ -660,19 +940,19 @@ function spawnRiftEnemy(g, kind, index = 0, formation = null) {
   return e;
 }
 __name(spawnRiftEnemy, "spawnRiftEnemy");
-function bullet(g, x, y, a, speed = 130) {
+function bullet2(g, x, y, a, speed = 130) {
   if (g.bullets.filter((b) => !b.dead).length >= 360) return;
   g.bullets.push({ id: testId(g), x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 5, testBullet: "rift" });
 }
-__name(bullet, "bullet");
-function fan(g, e, target, n = 2, spread = 0.2) {
+__name(bullet2, "bullet");
+function fan2(g, e, target, n = 2, spread = 0.2) {
   const a = Math.atan2(target.y - e.y, target.x - e.x);
-  for (let i = 0; i < n; i++) bullet(g, e.x, e.y + 10, a + (i - (n - 1) / 2) * spread);
+  for (let i = 0; i < n; i++) bullet2(g, e.x, e.y + 10, a + (i - (n - 1) / 2) * spread);
   e.muzzleUntil = g.time + 0.18;
 }
-__name(fan, "fan");
+__name(fan2, "fan");
 function radial2(g, e, n, turn = 0, speed = 110) {
-  for (let i = 0; i < n; i++) bullet(g, e.x, e.y, turn + i * Math.PI * 2 / n, speed);
+  for (let i = 0; i < n; i++) bullet2(g, e.x, e.y, turn + i * Math.PI * 2 / n, speed);
   e.muzzleUntil = g.time + 0.18;
 }
 __name(radial2, "radial");
@@ -740,25 +1020,25 @@ function phaseEnemy(g, e, clock, edt, live, target) {
     e.dashing -= clock;
   } else {
     e.y += e.speed * 0.3 * edt;
-    e.x = clamp2(e.x + Math.sin(e.age * 1.4) * 25 * edt, 30, 450);
+    e.x = clamp3(e.x + Math.sin(e.age * 1.4) * 25 * edt, 30, 450);
   }
 }
 __name(phaseEnemy, "phaseEnemy");
-function part(g, kind, side, hp) {
+function part2(g, kind, side, hp) {
   hp = Math.round(hp * (g.players ? 1.5 : 1));
   return { id: testId(g), type: "elite", testKind: kind, side, x: 240 + side * 135, y: -100, r: kind === "R_NODE" ? 23 : 27, hp, maxHp: hp, age: 0, aim: Math.PI / 2, stun: 0 };
 }
-__name(part, "part");
+__name(part2, "part");
 function makeRiftBoss(g) {
   const hp = g.players ? 8500 : 5e3;
-  return { id: testId(g), type: "boss", testKind: "R_BOSS", name: "\u661F\u74B0\u652F\u914D\u8005", x: 240, y: -100, r: 48, hp, maxHp: hp, age: 0, stage: 1, attack: "volley", attackTime: 3.4, fire: 1, sideIndex: 0, ringFire: 1.6, summon: 12, weakTime: 0, parts: [part(g, "R_GUN", -1, 600), part(g, "R_GUN", 1, 600), part(g, "R_NODE", 0, 350)] };
+  return { id: testId(g), type: "boss", testKind: "R_BOSS", name: "\u661F\u74B0\u652F\u914D\u8005", x: 240, y: -100, r: 48, hp, maxHp: hp, age: 0, stage: 1, attack: "volley", attackTime: 3.4, fire: 1, sideIndex: 0, ringFire: 1.6, summon: 12, weakTime: 0, parts: [part2(g, "R_GUN", -1, 600), part2(g, "R_GUN", 1, 600), part2(g, "R_NODE", 0, 350)] };
 }
 __name(makeRiftBoss, "makeRiftBoss");
-function warnBeam(g, b) {
+function warnBeam2(g, b) {
   const l = b.laser;
   (g.testWarnings ??= []).push({ x0: l.x0, y0: l.y0, x1: l.x0 + Math.cos(l.start) * 850, y1: l.y0 + Math.sin(l.start) * 850, kind: "riftlaser" });
 }
-__name(warnBeam, "warnBeam");
+__name(warnBeam2, "warnBeam");
 function summons(g, b, cap) {
   const n = b.stage === 2 ? 6 : 6;
   if (g.enemies.filter((e) => e.hp > 0).length + n > cap) return false;
@@ -800,7 +1080,7 @@ function stepRiftBoss(g, dt, enemyDt, live, onHit, emit) {
   b.r = b.weakTime ? 60 : 48;
   b.openSoon = ["warning", "laser"].includes(b.attack) ? b.attackTime : 0;
   if (clock === 0 && dt > 0) {
-    if (b.attack === "warning") warnBeam(g, b);
+    if (b.attack === "warning") warnBeam2(g, b);
     return;
   }
   if (b.beam) updateLaser(g, b, clock);
@@ -809,12 +1089,12 @@ function stepRiftBoss(g, dt, enemyDt, live, onHit, emit) {
     b.ringFire -= clock;
     const gun = b.parts[b.sideIndex % 2];
     if (gun.hp > 0) {
-      gun.charge = clamp2(1 - b.fire / 0.7, 0, 1);
+      gun.charge = clamp3(1 - b.fire / 0.7, 0, 1);
       gun.aim = Math.atan2(target.y - gun.y, target.x - gun.x);
     }
     if (b.fire <= 0) {
       if (gun.hp > 0 && gun.stun <= 0) {
-        if (b.stage === 1) fan(g, gun, target, 5, 0.24);
+        if (b.stage === 1) fan2(g, gun, target, 5, 0.24);
         else radial2(g, gun, 8, (b.sideIndex % 2 ? -1 : 1) * b.age * 0.3, 105);
       }
       b.sideIndex++;
@@ -825,11 +1105,11 @@ function stepRiftBoss(g, dt, enemyDt, live, onHit, emit) {
       b.ringFire = 9;
     }
   }
-  if (b.attack === "warning") warnBeam(g, b);
+  if (b.attack === "warning") warnBeam2(g, b);
   b.attackTime = Math.max(0, b.attackTime - clock);
   if (b.attackTime === 0) {
     if (b.attack === "volley") {
-      const x = b.stage === 2 ? b.sideIndex % 2 ? 55 : 425 : b.x, y = b.stage === 2 ? 90 : b.y + 20, a = clamp2(Math.atan2(target.y - y, target.x - x), 0.5, Math.PI - 0.5);
+      const x = b.stage === 2 ? b.sideIndex % 2 ? 55 : 425 : b.x, y = b.stage === 2 ? 90 : b.y + 20, a = clamp3(Math.atan2(target.y - y, target.x - x), 0.5, Math.PI - 0.5);
       b.laser = { x0: x, y0: y, start: a, end: a, length: 850, tone: "rift" };
       b.attack = "warning";
       b.attackTime = b.stage === 2 ? 1.2 : 1;
@@ -896,7 +1176,7 @@ function stepRiftEX(g, dt, enemyDt, players, onHit, emit) {
     if (e.arrivalShot > 0) {
       e.arrivalShot = Math.max(0, e.arrivalShot - clock);
       if (e.arrivalShot === 0 && target) {
-        if (nearest(live, e) >= 100) fan(g, e, e.testKind === "E18" ? e.dashTarget : target, 2);
+        if (nearest(live, e) >= 100) fan2(g, e, e.testKind === "E18" ? e.dashTarget : target, 2);
         else e.arrivalShot = 0.1;
       }
     }
@@ -909,10 +1189,10 @@ function stepRiftEX(g, dt, enemyDt, players, onHit, emit) {
     if (["E14", "E18"].includes(e.testKind)) phaseEnemy(g, e, clock, edt, live, target);
     else if (["E15", "E16", "E17", "EX03"].includes(e.testKind)) {
       e.y = Math.min(e.holdY, e.y + (e.speed || 100) * edt);
-      e.x = clamp2(e.startX + Math.sin(e.age * 0.6) * (e.testKind === "E16" ? 0 : 20), 45, 435);
+      e.x = clamp3(e.startX + Math.sin(e.age * 0.6) * (e.testKind === "E16" ? 0 : 20), 45, 435);
     } else {
       e.y += e.speed * edt;
-      e.x = clamp2(e.startX + Math.sin(e.age * 1.2) * (e.formation === "arc" ? 32 : 8), 25, 455);
+      e.x = clamp3(e.startX + Math.sin(e.age * 1.2) * (e.formation === "arc" ? 32 : 8), 25, 455);
     }
     if (dt) {
       e.vx = (e.x - ox) / dt;
@@ -926,7 +1206,7 @@ function stepRiftEX(g, dt, enemyDt, players, onHit, emit) {
     e.testHaste = factor < 1;
     e.fire -= clock;
     if (e.testKind === "E16") {
-      e.charge = clamp2(1 - e.fire / 0.7, 0, 1);
+      e.charge = clamp3(1 - e.fire / 0.7, 0, 1);
       if (e.fire <= 0.7) for (let i = 0; i < 8; i++) {
         const a = (e.cycle || 0) * Math.PI / 8 + i * Math.PI / 4;
         g.testWarnings.push({ x0: e.x, y0: e.y, x1: e.x + Math.cos(a) * 65, y1: e.y + Math.sin(a) * 65, kind: "gyro" });
@@ -947,7 +1227,7 @@ function stepRiftEX(g, dt, enemyDt, players, onHit, emit) {
           e.summon = 12;
         }
       } else {
-        fan(g, e, target, e.testKind === "E15" ? 5 : ["E14", "E18"].includes(e.testKind) ? 2 : 1, 0.22);
+        fan2(g, e, target, e.testKind === "E15" ? 5 : ["E14", "E18"].includes(e.testKind) ? 2 : 1, 0.22);
         e.fire = e.interval * factor;
       }
     }
@@ -1021,11 +1301,11 @@ function enterEXIntermission(g) {
 __name(enterEXIntermission, "enterEXIntermission");
 function startEXStageTwo(g, builds) {
   const actors = g.players || [g];
-  if (g.campaign !== "survivalex" || g.state !== "intermission" || (g.stageIndex < 0 || g.stageIndex >= 2) || !Array.isArray(builds) || builds.length !== actors.length) return false;
+  if (g.campaign !== "survivalex" || g.state !== "intermission" || (g.stageIndex < 0 || g.stageIndex >= 3) || !Array.isArray(builds) || builds.length !== actors.length) return false;
   if (!actors.every((a, i) => a.connected === false || skillBuildReady(builds[i], "survivalex"))) return false;
   g.stageIndex++;
   g.stageStartedAt = g.time;
-  g.mission = ["skytest", "deserttest", "riftex"][g.stageIndex];
+  g.mission = ["skytest", "deserttest", "riftex", "frozenex"][g.stageIndex];
   g.state = "playing";
   g.phase = 0;
   g.bossSpawned = false;
@@ -1057,7 +1337,7 @@ function startEXStageTwo(g, builds) {
 __name(startEXStageTwo, "startEXStageTwo");
 
 // ../dist/desert-test.js
-var clamp3 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
+var clamp4 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
 var DESERT_ENEMIES = Object.freeze({
   E07: { name: "\u7802\u71D5\u5075\u5BDF\u6A5F", hp: 45, speed: 125, r: 18, type: "scout", interval: 2.8 },
   E08: { name: "\u8D64\u880D\u6514\u622A\u6A5F", hp: 48, speed: 175, r: 20, type: "scout", interval: 2.6 },
@@ -1067,15 +1347,15 @@ var DESERT_ENEMIES = Object.freeze({
   E12: { name: "\u6C99\u66B4\u7A81\u8972\u6A5F", hp: 100, speed: 140, r: 21, type: "scout", interval: 3 },
   EX02: { name: "\u8D64\u7802\u57F7\u884C\u8005", hp: 1200, speed: 85, r: 37, type: "elite", interval: 3 }
 });
-var windows2 = [[5, 14, "E07", 8], [16, 29, "E07", 12], [30, 43, "E08", 4], [31, 44, "E07", 4], [45, 58, "E09", 2], [46, 59, "E07", 6], [60, 73, "E10", 2], [75, 80, "E11", 2], [76, 89, "E07", 8], [90, 98, "E12", 4], [100, 100, "EX02", 1], [101, 113, "E07", 4], [120, 130, "E09", 2], [121, 134, "E08", 4]];
-var DESERT_WAVES = windows2.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
+var windows3 = [[5, 14, "E07", 8], [16, 29, "E07", 12], [30, 43, "E08", 4], [31, 44, "E07", 4], [45, 58, "E09", 2], [46, 59, "E07", 6], [60, 73, "E10", 2], [75, 80, "E11", 2], [76, 89, "E07", 8], [90, 98, "E12", 4], [100, 100, "EX02", 1], [101, 113, "E07", 4], [120, 130, "E09", 2], [121, 134, "E08", 4]];
+var DESERT_WAVES = windows3.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
   const group = kind === "E07", batch = Math.floor(i / 3), batches = Math.ceil(n / 3);
   return { kind, index: i, time: group ? start + (end - start) * batch / Math.max(1, batches - 1) : start + (end - start) * i / Math.max(1, n - 1), formation: group ? { shape: wave % 2 ? "column" : "v", slot: i % 3, size: Math.min(3, n - batch * 3), lane: batch % 3, side: wave === 3 ? batch % 2 ? 1 : -1 : 0 } : null };
 })).sort((a, b) => a.time - b.time);
-function part2(g, kind, side, hp) {
+function part3(g, kind, side, hp) {
   return { id: testId(g), type: "elite", testKind: kind, side, x: 240 + side * 105, y: -90, r: kind === "D_RING" ? 25 : 27, hp: Math.round(hp * (g.players ? 1.5 : 1)), maxHp: Math.round(hp * (g.players ? 1.5 : 1)), age: 0, aim: Math.PI / 2, fire: 1 };
 }
-__name(part2, "part");
+__name(part3, "part");
 function spawnDesertEnemy(g, kind, index = 0, formation = null) {
   const spec = DESERT_ENEMIES[kind], side = index % 2 ? 1 : -1;
   let x = 80 + index % 5 * 80, y = -55;
@@ -1094,7 +1374,7 @@ function spawnDesertEnemy(g, kind, index = 0, formation = null) {
   }
   const hp = Math.round(spec.hp * (g.players ? 1.5 : 1));
   const e = { ...spec, id: testId(g), testKind: kind, hp, maxHp: hp, x, y, startX: x, age: 0, seed: index * 0.7, fire: 1.5, buffFactor: 1, side, formation: formation?.shape, sideEntry: formation?.side || 0, entrySafe: kind === "E08" || formation?.side ? 0.8 : 0, holdY: 150 + index % 3 * 45, dashPhase: 0, dashClock: 2.6, summon: 8 };
-  if (kind === "EX02") e.parts = [part2(g, "EX_ARM", -1, 250), part2(g, "EX_ARM", 1, 250)];
+  if (kind === "EX02") e.parts = [part3(g, "EX_ARM", -1, 250), part3(g, "EX_ARM", 1, 250)];
   g.enemies.push(e);
   return e;
 }
@@ -1103,22 +1383,22 @@ function desertFireMultiplier(g, e) {
   return e.testKind !== "E11" && g.enemies.some((s) => s.testKind === "E11" && s.hp > 0 && Math.hypot(s.x - e.x, s.y - e.y) <= 150) ? 0.85 : 1;
 }
 __name(desertFireMultiplier, "desertFireMultiplier");
-function bullet2(g, x, y, a, speed = 135) {
+function bullet3(g, x, y, a, speed = 135) {
   g.bullets.push({ id: testId(g), x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 5, testBullet: "sand" });
 }
-__name(bullet2, "bullet");
-function fan2(g, e, target, n, spread = 0.2, speed = 135) {
+__name(bullet3, "bullet");
+function fan3(g, e, target, n, spread = 0.2, speed = 135) {
   const a = Math.atan2(target.y - e.y, target.x - e.x);
-  for (let i = 0; i < n; i++) bullet2(g, e.x, e.y + 10, a + (i - (n - 1) / 2) * spread, speed);
+  for (let i = 0; i < n; i++) bullet3(g, e.x, e.y + 10, a + (i - (n - 1) / 2) * spread, speed);
   e.muzzleUntil = g.time + 0.18;
 }
-__name(fan2, "fan");
+__name(fan3, "fan");
 function armFan(g, arm, target, n, center) {
   const aim = { x: arm.side < 0 ? Math.min(target.x, center - 65) : Math.max(target.x, center + 65), y: Math.max(arm.y + 100, target.y) }, a = Math.atan2(aim.y - arm.y, aim.x - arm.x);
   for (let i = 0; i < n; i++) {
     const angle = a + (i - (n - 1) / 2) * 0.2, landing = arm.x + Math.cos(angle) / Math.sin(angle) * (aim.y - arm.y);
     if (Math.abs(landing - center) < 30) continue;
-    bullet2(g, arm.x, arm.y + 10, angle, 130);
+    bullet3(g, arm.x, arm.y + 10, angle, 130);
   }
   arm.muzzleUntil = g.time + 0.18;
 }
@@ -1131,7 +1411,7 @@ function warnings(g, l, sweep = false) {
 }
 __name(warnings, "warnings");
 function laserPlan(e, target, sweep = false, side = 1) {
-  const a = clamp3(Math.atan2(target.y - e.y, target.x - e.x), 0.5, Math.PI - 0.5);
+  const a = clamp4(Math.atan2(target.y - e.y, target.x - e.x), 0.5, Math.PI - 0.5);
   return { x0: e.x, y0: e.y + 15, start: a - (sweep ? side * 0.4 : 0), end: a + (sweep ? side * 0.4 : 0), length: 850, tone: "sand", sourceId: e.id };
 }
 __name(laserPlan, "laserPlan");
@@ -1153,7 +1433,7 @@ function fireLaser(g, e, seconds) {
 __name(fireLaser, "fireLaser");
 function makeDesertBoss(g) {
   const hp = g.players ? 6800 : 4e3;
-  return { id: testId(g), type: "boss", testKind: "D_BOSS", x: 240, y: -100, r: 48, hp, maxHp: hp, age: 0, stage: 1, attack: "volley", attackTime: 3.2, fire: 0.5, sideIndex: 0, sweepSide: 0, summon: 10, weakTime: 0, parts: [part2(g, "D_ARM", -1, 500), part2(g, "D_ARM", 1, 500), part2(g, "D_RING", 0, 300)] };
+  return { id: testId(g), type: "boss", testKind: "D_BOSS", x: 240, y: -100, r: 48, hp, maxHp: hp, age: 0, stage: 1, attack: "volley", attackTime: 3.2, fire: 0.5, sideIndex: 0, sweepSide: 0, summon: 10, weakTime: 0, parts: [part3(g, "D_ARM", -1, 500), part3(g, "D_ARM", 1, 500), part3(g, "D_RING", 0, 300)] };
 }
 __name(makeDesertBoss, "makeDesertBoss");
 function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
@@ -1173,7 +1453,7 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
     if (target2) p.aim = Math.atan2(target2.y - p.y, target2.x - p.x);
   }
   if (b.y < 155 || !live.length) return;
-  const target = live[Math.floor(b.age / 7) % live.length], ring = b.parts[2];
+  const target = live[Math.floor(b.age / 7) % live.length], ring2 = b.parts[2];
   if (b.hp <= b.maxHp * 0.5 && b.stage !== 2) {
     b.stage = 2;
     clearLaser(g, b);
@@ -1206,13 +1486,13 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
       if (arm.hp > 0 && arm.stun <= 0) armFan(g, arm, target, b.stage === 2 ? 7 : 5, b.x);
       b.fire = 1.25;
     }
-    if (b.stage === 2 && ring.hp > 0 && ring.stun <= 0) {
-      ring.fire -= clock;
-      if (ring.fire <= 0) {
+    if (b.stage === 2 && ring2.hp > 0 && ring2.stun <= 0) {
+      ring2.fire -= clock;
+      if (ring2.fire <= 0) {
         const count = 12, turn = b.age * 0.18;
-        for (let i = 0; i < count; i++) bullet2(g, ring.x, ring.y, turn + i * Math.PI * 2 / count, 105);
-        ring.fire = 1.3;
-        ring.muzzleUntil = g.time + 0.2;
+        for (let i = 0; i < count; i++) bullet3(g, ring2.x, ring2.y, turn + i * Math.PI * 2 / count, 105);
+        ring2.fire = 1.3;
+        ring2.muzzleUntil = g.time + 0.2;
       }
     }
   }
@@ -1233,8 +1513,8 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
         }
         b.laserPart = source.id;
       } else {
-        b.laserPart = ring.id;
-        if (ring.hp <= 0 || ring.stun > 0) {
+        b.laserPart = ring2.id;
+        if (ring2.hp <= 0 || ring2.stun > 0) {
           b.attack = "recovery";
           b.attackTime = 2;
           return;
@@ -1263,7 +1543,7 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
       b.r = 48;
     }
   }
-  if (b.attack !== "weak" && ring.hp > 0 && ring.stun <= 0) {
+  if (b.attack !== "weak" && ring2.hp > 0 && ring2.stun <= 0) {
     b.summon -= clock;
     const n = b.stage === 2 ? 3 : 2, cap = g.players ? 16 : 12;
     if (b.summon <= 0 && g.enemies.filter((e) => e.hp > 0).length + n <= cap) {
@@ -1329,7 +1609,7 @@ function stepDesertTest(g, dt, enemyDt, players, onHit, emit) {
       e.y = Math.min(e.holdY, e.y + 100 * edt);
     } else if (e.testKind === "E11" || e.testKind === "EX02") {
       e.y = Math.min(e.testKind === "EX02" ? 185 : 220, e.y + e.speed * edt);
-      e.x = clamp3(e.startX + Math.sin(e.age * 0.7) * 22, 50, 430);
+      e.x = clamp4(e.startX + Math.sin(e.age * 0.7) * 22, 50, 430);
     } else if (e.testKind === "E08") {
       if (e.age < 1.2) e.x -= e.side * e.speed * edt;
       else if (e.age < 1.55) {
@@ -1365,7 +1645,7 @@ function stepDesertTest(g, dt, enemyDt, players, onHit, emit) {
           e.dashClock = 3;
         }
       } else {
-        e.x = clamp3(e.startX + Math.sin(e.age * 1.8) * 60, 25, 455);
+        e.x = clamp4(e.startX + Math.sin(e.age * 1.8) * 60, 25, 455);
         e.y += e.speed * edt;
       }
     } else if (e.sideEntry) {
@@ -1386,7 +1666,7 @@ function stepDesertTest(g, dt, enemyDt, players, onHit, emit) {
     }
     e.testHaste = factor < 1;
     e.fire -= clock;
-    e.charge = e.testKind === "E10" ? clamp3(1 - e.fire / 0.7, 0, 1) : 0;
+    e.charge = e.testKind === "E10" ? clamp4(1 - e.fire / 0.7, 0, 1) : 0;
     tickLaser(g, e, clock);
     if (e.laserWarning > 0) {
       e.laserWarning = Math.max(0, e.laserWarning - clock);
@@ -1410,11 +1690,11 @@ function stepDesertTest(g, dt, enemyDt, players, onHit, emit) {
     }
     if ((dt === 0 || clock > 0) && e.fire <= 0 && e.y > 20 && e.y < 600 && e.x > 5 && e.x < 475 && target) {
       if (e.testKind === "EX02") {
-        for (const p of e.parts) if (p.hp > 0 && p.stun <= 0) fan2(g, p, target, 3, 0.22);
+        for (const p of e.parts) if (p.hp > 0 && p.stun <= 0) fan3(g, p, target, 3, 0.22);
       } else if (e.testKind === "E10" && (e.volley = (e.volley || 0) + 1) % 2 === 0) {
         e.laser = laserPlan(e, target);
         e.laserWarning = 1;
-      } else fan2(g, e, target, e.testKind === "E07" || e.testKind === "E11" ? 1 : e.testKind === "E09" ? 3 : e.testKind === "E10" ? 5 : 2, e.testKind === "E08" ? 0.3 : 0.2);
+      } else fan3(g, e, target, e.testKind === "E07" || e.testKind === "E11" ? 1 : e.testKind === "E09" ? 3 : e.testKind === "E10" ? 5 : 2, e.testKind === "E08" ? 0.3 : 0.2);
       e.fire = e.interval * factor;
     }
     for (const p of live) {
@@ -1440,12 +1720,12 @@ var TEST_ENEMIES = Object.freeze({
   E06: { name: "\u5E7B\u5F71\u7A81\u64CA\u6A5F", hp: 75, speed: 125, r: 20, type: "scout", interval: 3 },
   EX01: { name: "\u96F7\u7FFC\u6307\u63EE\u5B98", hp: 800, speed: 80, r: 36, type: "elite", interval: 2.5 }
 });
-var windows3 = [[5, 14, "E01", 6], [16, 33, "E01", 12], [35, 43, "E02", 4], [45, 57, "E03", 2], [46, 58, "E01", 6], [65, 72, "E04", 2], [75, 80, "E05", 2], [76, 88, "E01", 8], [90, 98, "E06", 4], [100, 100, "EX01", 1], [120, 129, "E03", 2], [121, 133, "E02", 4]];
-var TEST_WAVES = windows3.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
+var windows4 = [[5, 14, "E01", 6], [16, 33, "E01", 12], [35, 43, "E02", 4], [45, 57, "E03", 2], [46, 58, "E01", 6], [65, 72, "E04", 2], [75, 80, "E05", 2], [76, 88, "E01", 8], [90, 98, "E06", 4], [100, 100, "EX01", 1], [120, 129, "E03", 2], [121, 133, "E02", 4]];
+var TEST_WAVES = windows4.flatMap(([start, end, kind, n], wave) => Array.from({ length: n }, (_, i) => {
   const grouped = kind === "E01", batch = Math.floor(i / 3), batches = Math.ceil(n / 3);
   return { time: grouped ? start + (end - start) * batch / Math.max(1, batches - 1) : start + (end - start) * i / Math.max(1, n - 1), kind, index: i, formation: grouped ? { shape: wave % 2 ? "column" : "v", slot: i % 3, size: Math.min(3, n - batch * 3), lane: batch % 3 } : null };
 })).sort((a, b) => a.time - b.time);
-var clamp4 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
+var clamp5 = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
 function spawnTestEnemy(g, kind, index = 0, formation = null) {
   const spec = TEST_ENEMIES[kind], coop = !!g.players, side = index % 2 ? 1 : -1;
   let x = kind === "E02" ? side < 0 ? 35 : 445 : 80 + index % 5 * 80, y = -45;
@@ -1469,15 +1749,15 @@ function testDamageMultiplier(g, e) {
   return g.mission === "skytest" && e.testKind !== "E05" && e.type !== "boss" && g.enemies.some((s) => s.testKind === "E05" && s.hp > 0 && Math.hypot(s.x - e.x, s.y - e.y) <= 150) ? 0.85 : 1;
 }
 __name(testDamageMultiplier, "testDamageMultiplier");
-function bullet3(g, x, y, angle, speed = 135, kind = "normal") {
+function bullet4(g, x, y, angle, speed = 135, kind = "normal") {
   g.bullets.push({ id: g.nextId ? g.nextId++ : void 0, x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: kind === "laser" ? 7 : 5, testBullet: kind });
 }
-__name(bullet3, "bullet");
-function fan3(g, e, target, n, spread = 0.22) {
+__name(bullet4, "bullet");
+function fan4(g, e, target, n, spread = 0.22) {
   const a = Math.atan2(target.y - e.y, target.x - e.x);
-  for (let i = 0; i < n; i++) bullet3(g, e.x, e.y + 15, a + (i - (n - 1) / 2) * spread);
+  for (let i = 0; i < n; i++) bullet4(g, e.x, e.y + 15, a + (i - (n - 1) / 2) * spread);
 }
-__name(fan3, "fan");
+__name(fan4, "fan");
 function stepTestMission(g, dt, enemyDt, players, onHit, emit) {
   g.testWaveIndex ??= 0;
   g.testWarnings = [];
@@ -1516,10 +1796,10 @@ function stepTestMission(g, dt, enemyDt, players, onHit, emit) {
     const target = live[e.id % Math.max(1, live.length)];
     if (e.testKind === "E04" || e.testKind === "EX01") {
       e.y = Math.min(e.testKind === "E04" ? 170 : 185, e.y + e.speed * edt);
-      e.x = clamp4(e.startX + Math.sin(e.age * 0.7) * 30, 45, 435);
+      e.x = clamp5(e.startX + Math.sin(e.age * 0.7) * 30, 45, 435);
     } else if (e.testKind === "E02") {
       e.y += e.speed * edt;
-      e.x = clamp4(e.startX + (e.startX < 240 ? 1 : -1) * Math.sin(Math.min(e.age, 3) / 3 * Math.PI / 2) * 220, 25, 455);
+      e.x = clamp5(e.startX + (e.startX < 240 ? 1 : -1) * Math.sin(Math.min(e.age, 3) / 3 * Math.PI / 2) * 220, 25, 455);
     } else if (e.testKind === "E06") {
       e.dashClock -= clock;
       if (e.dashPhase === 0 && e.dashClock <= 0 && target) {
@@ -1546,21 +1826,21 @@ function stepTestMission(g, dt, enemyDt, players, onHit, emit) {
         }
       } else {
         e.y += e.speed * edt;
-        e.x = clamp4(e.startX + Math.sin(e.age * 2.4) * 55, 25, 455);
+        e.x = clamp5(e.startX + Math.sin(e.age * 2.4) * 55, 25, 455);
       }
     } else {
       e.y += e.speed * edt;
-      e.x = clamp4(e.startX + Math.sin(e.age * 1.5 + e.seed) * 15, 25, 455);
+      e.x = clamp5(e.startX + Math.sin(e.age * 1.5 + e.seed) * 15, 25, 455);
     }
     if (dt > 0) {
       e.vx = (e.x - oldX) / dt;
       e.vy = (e.y - oldY) / dt;
     }
-    e.charge = e.testKind === "E04" ? clamp4(1 - e.fire / 0.65, 0, 1) : 0;
+    e.charge = e.testKind === "E04" ? clamp5(1 - e.fire / 0.65, 0, 1) : 0;
     e.fire -= clock;
     if (e.fire <= 0 && e.y > 20 && e.y < 600 && target) {
-      if (e.testKind === "E01") bullet3(g, e.x, e.y, Math.PI / 2);
-      else fan3(g, e, target, e.testKind === "E03" ? 3 : e.testKind === "E04" ? 5 : e.testKind === "EX01" ? 7 : e.testKind === "E05" ? 1 : 2);
+      if (e.testKind === "E01") bullet4(g, e.x, e.y, Math.PI / 2);
+      else fan4(g, e, target, e.testKind === "E03" ? 3 : e.testKind === "E04" ? 5 : e.testKind === "EX01" ? 7 : e.testKind === "E05" ? 1 : 2);
       e.fire = e.interval;
       e.muzzleUntil = g.time + 0.16;
     }
@@ -1579,7 +1859,7 @@ function stepTestMission(g, dt, enemyDt, players, onHit, emit) {
   }
   g.enemies = g.enemies.filter((e) => e.hp > 0 && e.y < 870 && e.y > -320);
   for (const e of g.enemies) e.testProtected = testDamageMultiplier(g, e) < 1;
-  stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawnTestEnemy, cap, bullet3);
+  stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawnTestEnemy, cap, bullet4);
 }
 __name(stepTestMission, "stepTestMission");
 
@@ -1653,7 +1933,7 @@ function stepWeapon(actor, pos, dt, targets, damage, bullets = []) {
 __name(stepWeapon, "stepWeapon");
 
 // src/combat.mjs
-var clamp5 = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
+var clamp6 = /* @__PURE__ */ __name((v, a, b) => Math.max(a, Math.min(b, v)), "clamp");
 var CoopCombat = class {
   static {
     __name(this, "CoopCombat");
@@ -1733,7 +2013,7 @@ var CoopCombat = class {
     if (data.target && (!Number.isFinite(data.target.x) || !Number.isFinite(data.target.y))) return false;
     p.seq = data.seq;
     p.lastInput = now;
-    p.input = { x: data.x, y: data.y, target: data.target ? { x: clamp5(data.target.x, FLIGHT_BOUNDS.left, FLIGHT_BOUNDS.right), y: clamp5(data.target.y, FLIGHT_BOUNDS.top, FLIGHT_BOUNDS.bottom) } : null };
+    p.input = { x: data.x, y: data.y, target: data.target ? { x: clamp6(data.target.x, FLIGHT_BOUNDS.left, FLIGHT_BOUNDS.right), y: clamp6(data.target.y, FLIGHT_BOUNDS.top, FLIGHT_BOUNDS.bottom) } : null };
     if (this.state === "playing" && this.intro <= 0) {
       if (data.missile === true && startWeapon(p, p, p.aircraft, p.input, () => this.launch(p, 8, false))) this.event("missile", { slot });
       if (data.support === true && p.energy >= 100 && this.res <= 0 && this.burst <= 0) {
@@ -1766,6 +2046,7 @@ var CoopCombat = class {
       p.score += points;
       p.kills++;
       p.energy = Math.min(100, p.energy + 10);
+      for (const ally of this.players) if (ally.slot !== p.slot) ally.energy = Math.min(100, ally.energy + 5);
       this.event("explosion", { x: e.x, y: e.y, boss: e.type === "boss", enemyType: e.type });
       if (e.type === "boss") this.finish(true);
     }
@@ -1807,7 +2088,7 @@ var CoopCombat = class {
   }
   finish(win) {
     if (["result", "transition"].includes(this.state) || this.state === "intermission" && win) return;
-    if (win && this.campaign === "survivalex" && this.stageIndex < 2) {
+    if (win && this.campaign === "survivalex" && this.stageIndex < 3) {
       enterEXIntermission(this);
       this.event("intermission");
       return;
@@ -1849,11 +2130,11 @@ var CoopCombat = class {
       return;
     }
     this.time += dt;
-    if (!["skytest", "deserttest", "riftex", "survivalex"].includes(this.campaign) && this.stageTime >= 190) {
+    if (!["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(this.campaign) && this.stageTime >= 190) {
       this.finish(false);
       return;
     }
-    if (!["skytest", "deserttest", "riftex", "survivalex"].includes(this.campaign)) this.phase = this.stageTime < 65 ? 0 : this.stageTime < 130 ? 1 : 2;
+    if (!["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(this.campaign)) this.phase = this.stageTime < 65 ? 0 : this.stageTime < 130 ? 1 : 2;
     const rules = supportRules(this), active = this.res > 0, resStep = Math.min(dt, this.res), movementTime = dt + resStep * (rules.move - 1), bulletStep = dt - resStep * (1 - rules.bullet), enemyStep = dt + resStep * (rules.enemyMove - 1);
     this.burst = Math.max(0, this.burst - dt);
     if (this.res > 0) {
@@ -1896,8 +2177,8 @@ var CoopCombat = class {
           p.y += dy / d * movement;
         }
       }
-      p.x = clamp5(p.x, FLIGHT_BOUNDS.left, FLIGHT_BOUNDS.right);
-      p.y = clamp5(p.y, FLIGHT_BOUNDS.top, FLIGHT_BOUNDS.bottom);
+      p.x = clamp6(p.x, FLIGHT_BOUNDS.left, FLIGHT_BOUNDS.right);
+      p.y = clamp6(p.y, FLIGHT_BOUNDS.top, FLIGHT_BOUNDS.bottom);
       p.ackSeq = p.seq;
       p.fire -= dt;
       if (p.fire <= 0) {
@@ -1905,7 +2186,8 @@ var CoopCombat = class {
         for (const shot of aircraftShots(p.aircraft, p.x, p.y)) this.shots.push({ id: this.nextId++, owner: p.slot, ...shot });
       }
     }
-    if (this.mission === "riftex") stepRiftEX(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
+    if (this.mission === "frozenex") stepFrozenEX(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
+    else if (this.mission === "riftex") stepRiftEX(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
     else if (this.mission === "deserttest") stepDesertTest(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
     else if (this.mission === "skytest") stepTestMission(this, dt, enemyStep, this.players, (p, source) => this.hit(p, source), (type) => this.event(type));
     else {
@@ -1925,7 +2207,7 @@ var CoopCombat = class {
         e.stun = Math.max(0, (e.stun || 0) - dt);
         e.age += edt;
         e.y += e.speed * edt;
-        e.x = clamp5(e.x + Math.sin(e.age * 1.7 + e.seed) * 35 * edt, 20, 460);
+        e.x = clamp6(e.x + Math.sin(e.age * 1.7 + e.seed) * 35 * edt, 20, 460);
         e.fire -= dt - stopped;
         if (stopped < dt && e.fire <= 0 && e.y > 20 && live2.length) {
           const p = live2[e.id % live2.length], a = Math.atan2(p.y - e.y, p.x - e.x), n = e.type === "elite" ? 3 : 1;
@@ -2113,7 +2395,7 @@ var BattleRoom = class {
     if (this.result) return;
     this.phase = "result";
     this.finishedAt = now;
-    this.result = { matchId: this.id, campaign: this.game.campaign, win: this.game.win, total: this.game.score, players: this.game.players.map((p) => ({ id: p.id, name: p.name, score: p.score, kills: p.kills })), duration: this.game.time, completedAt: now, eligible: !["skytest", "deserttest", "riftex", "survivalex"].includes(this.game.campaign) && reason === "completed" && this.started && !this.soloContinued && this.online.every(Boolean), reason: ["skytest", "deserttest", "riftex", "survivalex"].includes(this.game.campaign) ? "test-mission" : this.soloContinued ? "solo-continued" : reason };
+    this.result = { matchId: this.id, campaign: this.game.campaign, win: this.game.win, total: this.game.score, players: this.game.players.map((p) => ({ id: p.id, name: p.name, score: p.score, kills: p.kills })), duration: this.game.time, completedAt: now, eligible: !["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(this.game.campaign) && reason === "completed" && this.started && !this.soloContinued && this.online.every(Boolean), reason: ["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(this.game.campaign) ? "test-mission" : this.soloContinued ? "solo-continued" : reason };
   }
   advance(now) {
     if (this.phase === "reconnecting" && now >= this.deadline) {
@@ -2158,9 +2440,9 @@ function networkSnapshot(snapshot) {
     ...w,
     players: w.players.map((p) => pick(p, ["id", "name", "slot", "aircraft", "singer", "x", "y", "hp", "energy", "score", "kills", "invuln", "missileCd", "seq", "ackSeq", "connected", "shield", "shieldHitUntil", "skill", "skillCampaign", "skillBuild", "weaponFx", "weaponCharges", "weaponGap", "dashShield", "bulletImmune", "speedBoost"])),
     enemies: w.enemies.map((e) => ({ ...pick(e, ["id", "type", "testKind", "testProtected", "maxHp", "x", "y", "hp", "r", "age", "seed", "stun", "vx", "vy", "dashPhase", "charge", "muzzleUntil", "hitUntil", "testHaste", "laserWarning", "phased", "phaseWarning", "exit", "dashAngle", "links", "weakUntil", "arrivalSafe", "entrySafe"]), parts: e.parts?.map((p) => pick(p, ["id", "type", "testKind", "side", "x", "y", "hp", "maxHp", "r", "age", "aim", "stun", "hitUntil", "muzzleUntil"])) })),
-    boss: w.boss ? { ...pick(w.boss, ["id", "type", "testKind", "x", "y", "hp", "maxHp", "r", "age", "fire", "stun", "stage", "attack", "weakTime", "warning", "hitUntil", "openSoon"]), parts: (w.boss.parts || []).map((p) => pick(p, ["id", "type", "testKind", "side", "x", "y", "hp", "maxHp", "r", "age", "stun", "aim", "muzzleUntil", "hitUntil", "destroyedAt", "charge"])) } : null,
+    boss: w.boss ? { ...pick(w.boss, ["id", "type", "testKind", "name", "x", "y", "hp", "maxHp", "r", "age", "fire", "stun", "stage", "attack", "weakTime", "warning", "hitUntil", "openSoon"]), parts: (w.boss.parts || []).map((p) => pick(p, ["id", "type", "testKind", "side", "x", "y", "hp", "maxHp", "r", "age", "stun", "aim", "muzzleUntil", "hitUntil", "destroyedAt", "charge"])) } : null,
     shots: w.shots.map((s) => pick(s, ["id", "owner", "x", "y", "vx", "vy", "critical", "super"])),
-    bullets: w.bullets.map((s) => pick(s, ["id", "x", "y", "vx", "vy", "r", "testBullet", "beamId", "angle", "width", "tone", "sourceId"])),
+    bullets: w.bullets.map((s) => pick(s, ["id", "x", "y", "vx", "vy", "r", "testBullet", "beamId", "angle", "width", "tone", "sourceId", "splitIn", "splitAngle", "splitWarning"])),
     missiles: w.missiles.map((m) => pick(m, ["id", "owner", "x", "y", "vx", "vy", "life", "age", "super"]))
   } };
 }
@@ -2241,7 +2523,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, mission04EX: true, survivalEXStages: 4, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -2274,12 +2556,12 @@ var worker_default = { async fetch(request, env) {
     if (!data || data.aud !== "sky-room-create" || !rosterValid(data.players) || typeof data.matchId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(data.matchId)) return response({ error: "Unauthorized" }, 401);
     if (!data.players.every((p) => skillBuildReady(p.build, data.players[0].mission))) return response({ error: "\u751F\u5B58\u4E4B\u9053\uFF0F\u6E2C\u8A66\u95DC\u5361\u9700\u6240\u6709\u73A9\u5BB6\u7528\u5B8C 3 \u9EDE\u5F37\u5316\u9EDE\u6578\u624D\u80FD\u51FA\u64CA\u3002" }, 409);
     const gate = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName("__admission"));
-    const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: ["skytest", "deserttest", "riftex", "survivalex"].includes(data.players[0].mission) ? 24 * 60 * 6e4 : data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
+    const admitted = await gate.fetch(new Request("https://internal/admit", { method: "POST", body: JSON.stringify({ matchId: data.matchId, ttl: ["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(data.players[0].mission) ? 24 * 60 * 6e4 : data.players[0].mission === "survival" ? 10 * 6e4 : 6 * 6e4 }) }));
     if (!admitted.ok) return admitted;
     const stub = env.BATTLE_ROOMS.get(env.BATTLE_ROOMS.idFromName(data.matchId), { locationHint: roomLocationHint(env) });
     const created = await stub.fetch(new Request("https://internal/create", { method: "POST", body: JSON.stringify(data) }));
     if (!created.ok) return created;
-    return response({ combatLayoutV2: true, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, survivalEXStages: 3, lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
+    return response({ combatLayoutV2: true, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, mission03EX: true, mission04EX: true, survivalEXStages: 4, lobbyLoadoutLock: true, survivalSkills: true, survivalRoute: true, specialWeapons: true, desertMission: true, aircraftSelection: true, matchId: data.matchId, ws: url.origin.replace("https:", "wss:") + "/room/" + data.matchId, tickets: await Promise.all(data.players.map((p, i) => ticket(env.BATTLE_SECRET, data.matchId, p, i))) });
   }
   if (url.pathname.startsWith("/room/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
@@ -2492,7 +2774,7 @@ var BattleService = class extends DurableObject {
     this.timer = setInterval(() => {
       const now = Date.now();
       if (!this.room) return;
-      if (this.room.phase === "loading" && now - this.created > 6e4 || !["skytest", "deserttest", "riftex", "survivalex"].includes(this.room.game.campaign) && now - this.created > (this.room.game.campaign === "survival" ? 9 : 5) * 6e4) {
+      if (this.room.phase === "loading" && now - this.created > 6e4 || !["skytest", "deserttest", "riftex", "frozenex", "survivalex"].includes(this.room.game.campaign) && now - this.created > (this.room.game.campaign === "survival" ? 9 : 5) * 6e4) {
         this.room.game.finish(false);
         this.room.complete(now, "timeout");
       }
