@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 49;
+var BACKEND_VERSION = 50;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -694,7 +694,7 @@ function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet7) {
     if (b.fire <= 0) {
       const p = b.parts[b.volleySide++ % 2];
       if (p.hp > 0 && p.stun <= 0) {
-        const n = b.stage >= 2 ? p.side < 0 ? 9 : 7 : p.side < 0 ? 5 : 3, spread = b.stage >= 2 ? 0.19 : 0.16;
+        const n = b.stage >= 2 ? p.side < 0 ? 11 : 9 : p.side < 0 ? 5 : 3, spread = b.stage >= 2 ? 0.19 : 0.16;
         for (let i = 0; i < n; i++) {
           const offset = (i - (n - 1) / 2) * spread;
           if (b.stage >= 2 && Math.abs(offset) < 0.15) continue;
@@ -702,7 +702,7 @@ function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet7) {
         }
         p.muzzleUntil = g.time + 0.18;
       }
-      b.fire = 1.2;
+      b.fire = b.stage >= 2 ? 1.05 : 1.2;
     }
   }
   if (b.attack === "warning") warning(g, b);
@@ -742,13 +742,13 @@ __name(stepTestBoss, "stepTestBoss");
 var bossPartsUnlocked = /* @__PURE__ */ __name((b) => !!b && (b.partsUnlocked === true || b.hp < b.maxHp * 0.8), "bossPartsUnlocked");
 function bossPartDamageMultiplier(g, e) {
   const b = g.boss;
-  if (b === e) return b.hp < b.maxHp * 0.8 ? 0.3 : 1;
+  if (b === e) return b.hp < b.maxHp * 0.5 ? 0.3 : b.hp < b.maxHp * 0.8 ? 0.5 : 1;
   if (!b?.parts?.includes(e)) return 1;
   return bossPartsUnlocked(b) ? 1 : 0;
 }
 __name(bossPartDamageMultiplier, "bossPartDamageMultiplier");
 function unlockBossParts(b) {
-  if (b?.hp <= b?.maxHp * 0.8) b.partsUnlocked = true;
+  if (b?.hp < b?.maxHp * 0.8) b.partsUnlocked = true;
 }
 __name(unlockBossParts, "unlockBossParts");
 
@@ -1113,13 +1113,13 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
     b.fire -= clock;
     if (b.fire <= 0) {
       const arm = b.parts[b.sideIndex++ % 2];
-      if (arm.hp > 0 && arm.stun <= 0) armFan(g, arm, target, b.stage >= 2 ? 7 : 5, b.x);
-      b.fire = 1.25;
+      if (arm.hp > 0 && arm.stun <= 0) armFan(g, arm, target, b.stage >= 2 ? 9 : 5, b.x);
+      b.fire = b.stage >= 2 ? 1.1 : 1.25;
     }
     if (b.stage >= 2 && ring3.hp > 0 && ring3.stun <= 0) {
       ring3.fire -= clock;
       if (ring3.fire <= 0) {
-        const count = 12, turn = b.age * 0.18;
+        const count = 14, turn = b.age * 0.18;
         for (let i = 0; i < count; i++) bullet2(g, ring3.x, ring3.y, turn + i * Math.PI * 2 / count, 105);
         ring3.fire = 1.3;
         ring3.muzzleUntil = g.time + 0.2;
@@ -1520,10 +1520,10 @@ function stepRiftBoss(g, dt, enemyDt, live, onHit, emit) {
     if (b.fire <= 0) {
       if (gun.hp > 0 && gun.stun <= 0) {
         if (b.stage === 1) fan3(g, gun, target, 5, 0.24);
-        else radial2(g, gun, 8, (b.sideIndex % 2 ? -1 : 1) * b.age * 0.3, 105);
+        else radial2(g, gun, 10, (b.sideIndex % 2 ? -1 : 1) * b.age * 0.3, 105);
       }
       b.sideIndex++;
-      b.fire = 1.35;
+      b.fire = b.stage >= 2 ? 1.2 : 1.35;
     }
     if (b.ringFire <= 0 && b.stage === 1) {
       radial2(g, b, 12, b.age * 0.12, 105);
@@ -1782,12 +1782,12 @@ function stepFrozenBoss(g, dt, enemyDt, live, onHit, emit) {
       gun.aim = Math.atan2(target.y - gun.y, target.x - gun.x);
     }
     if (b.fire <= 0) {
-      if (gun.hp > 0 && gun.stun <= 0) fan4(g, gun, target, b.stage >= 2 ? 5 : 3, 0.28, false);
+      if (gun.hp > 0 && gun.stun <= 0) fan4(g, gun, target, b.stage >= 2 ? 7 : 3, 0.28, false);
       b.sideIndex++;
-      b.fire = 1.5;
+      b.fire = b.stage >= 2 ? 1.35 : 1.5;
     }
     if (b.crystalFire <= 0 && b.parts[2].hp > 0 && b.parts[2].stun <= 0) {
-      if (b.stage >= 2) ring(g, b, target, 10, b.age * 0.14, true);
+      if (b.stage >= 2) ring(g, b, target, 12, b.age * 0.14, true);
       else fan4(g, b, target, 3, 0.55, true);
       b.crystalFire = 5;
     }
@@ -2148,12 +2148,12 @@ function stepMagmaBoss(g, dt, enemyDt, live, onHit, emit) {
       gun.aim = Math.atan2(target.y - gun.y, target.x - gun.x);
     }
     if (b.fire <= 0) {
-      if (gun.hp > 0 && gun.stun <= 0) fan5(g, gun, target, b.stage >= 2 ? 3 : 3, 0.3, gun.side > 0 && b.stage >= 2);
+      if (gun.hp > 0 && gun.stun <= 0) fan5(g, gun, target, b.stage >= 2 ? 5 : 3, 0.3, gun.side > 0 && b.stage >= 2);
       b.sideIndex++;
-      b.fire = 1.5;
+      b.fire = b.stage >= 2 ? 1.35 : 1.5;
     }
     if (b.crystalFire <= 0 && b.parts[2].hp > 0 && b.parts[2].stun <= 0) {
-      if (b.stage >= 2) ring2(g, b, target, 8, b.age * 0.14, true);
+      if (b.stage >= 2) ring2(g, b, target, 10, b.age * 0.14, true);
       else fan5(g, b, target, 1, 0.55, true);
       b.crystalFire = 5;
     }
@@ -2376,7 +2376,7 @@ function fireRealm(g, b, realm, target) {
     }
     return;
   }
-  const count = (b.stage >= 2 ? { sky: 5, desert: 7, frozen: 9, magma: 5 } : { sky: 3, desert: 5, frozen: 7, magma: 3 })[realm], spread = { sky: 0.22, desert: 0.24, frozen: 0.19, magma: 0.34 }[realm];
+  const count = (b.stage >= 2 ? { sky: 7, desert: 9, frozen: 11, magma: 7 } : { sky: 3, desert: 5, frozen: 7, magma: 3 })[realm], spread = { sky: 0.22, desert: 0.24, frozen: 0.19, magma: 0.34 }[realm];
   for (let i = 0; i < count; i++) bullet6(g, s.x, s.y + 8, a + (i - (count - 1) / 2) * spread, realm === "frozen" ? 95 : realm === "sky" ? 140 : 115, realm === "magma" && i === Math.floor(count / 2));
 }
 __name(fireRealm, "fireRealm");
@@ -2463,7 +2463,7 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
     b.fire -= clock;
     if (b.fire <= 0) {
       for (const realm of b.realms) fireRealm(g, b, realm, target);
-      b.fire = (b.stage >= 2 ? 1.5 : 1.35) * (b.parts.some((p) => p.testKind === "C_SAND_WING" && p.hp > 0 && p.stun <= 0) ? 0.9 : 1);
+      b.fire = (b.stage >= 2 ? 1.35 : 1.35) * (b.parts.some((p) => p.testKind === "C_SAND_WING" && p.hp > 0 && p.stun <= 0) ? 0.9 : 1);
     }
   }
   if (b.attack === "judgment" && !b.judgmentFired && b.attackTime - clock <= 0.7) {
