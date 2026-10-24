@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 45;
+var BACKEND_VERSION = 46;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -466,7 +466,7 @@ __name(pruneSkillVolleys, "pruneSkillVolleys");
 
 // ../dist/test-boss.js
 var clamp = /* @__PURE__ */ __name((n, a, b) => Math.max(a, Math.min(b, n)), "clamp");
-var combatTargets = /* @__PURE__ */ __name((g) => [...g.enemies.flatMap((e) => e.hp > 0 && !e.phased ? [e, ...(e.parts || []).filter((p) => p.hp > 0)] : []), ...g.boss?.hp > 0 ? [g.boss, ...(g.boss.parts || []).filter((p) => p.hp > 0)] : []], "combatTargets");
+var combatTargets = /* @__PURE__ */ __name((g) => [...g.enemies.flatMap((e) => e.hp > 0 && !e.phased ? [e, ...(e.parts || []).filter((p) => p.hp > 0)] : []), ...g.boss?.hp > 0 ? [g.boss, ...(g.boss.parts || []).filter((p) => p.hp > 0 && (g.boss.testKind !== "C_BOSS" || g.boss.hp <= g.boss.maxHp * 0.8))] : []], "combatTargets");
 var testId = /* @__PURE__ */ __name((g) => g.nextId ? g.nextId++ : g.testNextId = (g.testNextId || 1e4) + 1, "testId");
 function makeTestBoss(g) {
   const hp = g.players ? 5100 : 3e3, partHp = g.players ? 600 : 400;
@@ -2175,7 +2175,7 @@ function spawnConvergenceEnemy(g, realm, kind, index = 0) {
 }
 __name(spawnConvergenceEnemy, "spawnConvergenceEnemy");
 function part5(g, kind, side, hp) {
-  hp = Math.round(hp * (g.players ? 1.5 : 1));
+  hp = Math.round((g.players ? 14280 : 8400) * 0.15);
   return { id: testId(g), testKind: kind, type: "elite", side, x: 240 + side * 110, y: -100, r: kind.endsWith("WING") ? 22 : 27, hp, maxHp: hp, age: 0, aim: Math.PI / 2, stun: 0 };
 }
 __name(part5, "part");
@@ -2202,14 +2202,15 @@ function fireRealm(g, b, realm, target) {
   s.muzzleUntil = g.time + 0.2;
   s.aim = a;
   if (realm === "rift") {
-    for (let i = 0; i < 12; i++) {
-      const angle = i * Math.PI / 6 + b.age * 0.12;
+    const n = b.stage === 3 ? 18 : 12;
+    for (let i = 0; i < n; i++) {
+      const angle = i * Math.PI * 2 / n + b.age * 0.12;
       if (Math.abs(Math.atan2(Math.sin(angle - a), Math.cos(angle - a))) > 0.36) bullet6(g, s.x, s.y, angle, 100);
     }
     return;
   }
-  const count = { sky: 3, desert: 5, frozen: 7, magma: 3 }[realm], spread = { sky: 0.22, desert: 0.24, frozen: 0.19, magma: 0.34 }[realm];
-  for (let i = 0; i < count; i++) bullet6(g, s.x, s.y + 8, a + (i - (count - 1) / 2) * spread, realm === "frozen" ? 95 : realm === "sky" ? 140 : 115, realm === "magma" && i === 1);
+  const count = (b.stage >= 2 ? { sky: 5, desert: 7, frozen: 9, magma: 5 } : { sky: 3, desert: 5, frozen: 7, magma: 3 })[realm], spread = { sky: 0.22, desert: 0.24, frozen: 0.19, magma: 0.34 }[realm];
+  for (let i = 0; i < count; i++) bullet6(g, s.x, s.y + 8, a + (i - (count - 1) / 2) * spread, realm === "frozen" ? 95 : realm === "sky" ? 140 : 115, realm === "magma" && i === Math.floor(count / 2));
 }
 __name(fireRealm, "fireRealm");
 function setCycle(b) {
@@ -2255,10 +2256,10 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
   }
   if (b.y < 155 || !live.length) return;
   const target = live[Math.floor(b.age / 7) % live.length];
-  if (b.stage === 1 && b.hp <= b.maxHp * 0.5) {
+  if (b.stage === 1 && b.hp <= b.maxHp * 0.8 || b.stage === 2 && b.hp <= b.maxHp * 0.5) {
     clearLaser(g, b);
     g.bullets = [];
-    b.stage = 2;
+    b.stage = b.hp <= b.maxHp * 0.5 ? 3 : 2;
     b.attack = "weak";
     b.attackTime = 3;
     b.realms = [];
@@ -2282,7 +2283,7 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
     b.fire -= clock;
     if (b.fire <= 0) {
       for (const realm of b.realms) fireRealm(g, b, realm, target);
-      b.fire = (b.stage === 2 ? 1.75 : 1.35) * (b.parts.some((p) => p.testKind === "C_SAND_WING" && p.hp > 0 && p.stun <= 0) ? 0.9 : 1);
+      b.fire = (b.stage >= 2 ? 1.5 : 1.35) * (b.parts.some((p) => p.testKind === "C_SAND_WING" && p.hp > 0 && p.stun <= 0) ? 0.9 : 1);
     }
   }
   if (b.attack === "judgment" && !b.judgmentFired && b.attackTime - clock <= 0.7) {
@@ -2296,12 +2297,12 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
     if (b.attack === "volley") planBeam(b, target);
     else if (b.attack === "warning") {
       startLaser(g, b);
-      b.attackTime = 1.2;
-      b.beam.total = 1.2;
+      b.attackTime = b.stage === 3 ? 1.8 : 1.2;
+      b.beam.total = b.attackTime;
     } else if (b.attack === "laser") {
       clearLaser(g, b);
       b.attack = "weak";
-      b.attackTime = 2.4;
+      b.attackTime = b.stage === 3 ? 1.8 : 2.4;
       b.realms = [];
       b.warning = 0;
     } else if (b.attack === "judgment") {
@@ -2312,7 +2313,7 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
       } else planBeam(b, target, 1.5);
     } else {
       b.cycleIndex++;
-      if (b.stage === 2 && b.cycleIndex % 3 === 0) {
+      if (b.stage >= 2 && b.cycleIndex % (b.stage === 3 ? 2 : 3) === 0) {
         b.attack = "judgment";
         b.judgmentIndex = 0;
         b.judgmentFired = false;
@@ -2325,7 +2326,7 @@ function stepConvergenceBoss(g, dt, enemyDt, live, onHit, emit) {
   b.summon -= clock;
   const skyWing = b.parts.find((p) => p.testKind === "C_SKY_WING");
   if (b.summon <= 0 && b.attack === "weak" && skyWing.hp > 0 && skyWing.stun <= 0 && g.enemies.filter((e) => e.hp > 0).length <= 4) {
-    for (let i = 0; i < 2; i++) spawnConvergenceEnemy(g, b.stage === 2 ? 2 : 0, b.stage === 2 ? "E13" : "E01", i);
+    for (let i = 0; i < 2; i++) spawnConvergenceEnemy(g, b.stage >= 2 ? 2 : 0, b.stage >= 2 ? "E13" : "E01", i);
     b.summon = 20;
   }
   for (const p of live) {
@@ -2402,6 +2403,14 @@ function stepConvergenceEX(g, dt, enemyDt, players, onHit, emit) {
   }
 }
 __name(stepConvergenceEX, "stepConvergenceEX");
+function convergenceDamageMultiplier(g, e) {
+  const b = g.boss;
+  if (b?.testKind !== "C_BOSS") return 1;
+  if (b.parts?.includes(e)) return b.hp > b.maxHp * 0.8 ? 0 : 1;
+  if (e === b && b.hp <= b.maxHp * 0.8 && b.hp > b.maxHp * 0.5) return 0.3;
+  return 1;
+}
+__name(convergenceDamageMultiplier, "convergenceDamageMultiplier");
 
 // ../dist/support-damage.js
 var SupportDamage = class {
@@ -2677,7 +2686,7 @@ var CoopCombat = class {
   damage(e, amount, owner) {
     if (e.hp <= 0 || this.state !== "playing") return;
     e.hitUntil = this.time + 0.16;
-    e.hp = Math.max(0, e.hp - amount * (this.res > 0 ? supportRules(this).vulnerability : 1) * testDamageMultiplier(this, e));
+    e.hp = Math.max(0, e.hp - amount * (this.res > 0 ? supportRules(this).vulnerability : 1) * testDamageMultiplier(this, e) * convergenceDamageMultiplier(this, e));
     if (e.hp === 0) {
       const p = this.players[owner], points = e.type === "boss" ? 5e3 : e.type === "elite" ? 300 : 100;
       this.score += points;
