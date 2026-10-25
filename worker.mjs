@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 51;
+var BACKEND_VERSION = 52;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -419,10 +419,13 @@ function stepTestBoss(g, dt, enemyDt, live, onHit, emit, spawn, cap, bullet7) {
     if (b.fire <= 0 && moduleBossFireFactor(g) > 0) {
       const p = b.parts[b.volleySide++ % 2];
       if (p.hp > 0 && p.stun <= 0) {
-        const n = b.stage >= 2 ? p.side < 0 ? 11 : 9 : p.side < 0 ? 5 : 3, spread = b.stage >= 2 ? 0.19 : 0.16;
+        const n = b.stage === 2 ? p.side < 0 ? 7 : 5 : b.stage >= 3 ? p.side < 0 ? 11 : 9 : p.side < 0 ? 5 : 3, spread = b.stage >= 2 ? 0.19 : 0.16;
         for (let i = 0; i < n; i++) {
-          const offset = (i - (n - 1) / 2) * spread;
-          if (b.stage >= 2 && Math.abs(offset) < 0.15) continue;
+          let offset = (i - (n - 1) / 2) * spread;
+          if (b.stage === 2) {
+            const slot = i - Math.floor(n / 2);
+            offset = (slot < 0 ? slot : slot + 1) * spread * (Math.floor((b.volleySide - 1) / 2) % 2 ? -1 : 1);
+          } else if (b.stage >= 3 && Math.abs(offset) < 0.15) continue;
           bullet7(g, p.x, p.y + 8, p.aim + offset, b.stage >= 2 ? 140 : 125);
         }
         p.muzzleUntil = g.time + 0.18;
@@ -1423,11 +1426,17 @@ function fan2(g, e, target, n, spread = 0.2, speed = 135) {
   e.muzzleUntil = g.time + 0.18;
 }
 __name(fan2, "fan");
-function armFan(g, arm, target, n, center) {
+function armFan(g, arm, target, n, center, exact = false) {
   const aim = { x: arm.side < 0 ? Math.min(target.x, center - 65) : Math.max(target.x, center + 65), y: Math.max(arm.y + 100, target.y) }, a = Math.atan2(aim.y - arm.y, aim.x - arm.x);
+  let emitted = 0;
   for (let i = 0; i < n; i++) {
     const angle = a + (i - (n - 1) / 2) * 0.2, landing = arm.x + Math.cos(angle) / Math.sin(angle) * (aim.y - arm.y);
     if (Math.abs(landing - center) < 30) continue;
+    bullet2(g, arm.x, arm.y + 10, angle, 130);
+    emitted++;
+  }
+  if (exact) for (let i = 0; emitted < n; i++, emitted++) {
+    const angle = clamp5(a - arm.side * ((n + 1) / 2 + i) * 0.2, 0.15, Math.PI - 0.15);
     bullet2(g, arm.x, arm.y + 10, angle, 130);
   }
   arm.muzzleUntil = g.time + 0.18;
@@ -1507,13 +1516,13 @@ function stepDesertBoss(g, dt, enemyDt, live, onHit, emit) {
     b.fire -= clock * moduleBossFireFactor(g);
     if (b.fire <= 0 && moduleBossFireFactor(g) > 0) {
       const arm = b.parts[b.sideIndex++ % 2];
-      if (arm.hp > 0 && arm.stun <= 0) armFan(g, arm, target, b.stage >= 2 ? 9 : 5, b.x);
+      if (arm.hp > 0 && arm.stun <= 0) armFan(g, arm, target, b.stage === 2 ? 7 : b.stage >= 3 ? 9 : 5, b.x, b.stage === 2);
       b.fire = b.stage >= 2 ? 1.1 : 1.25;
     }
     if (b.stage >= 2 && ring3.hp > 0 && ring3.stun <= 0) {
       ring3.fire -= clock * moduleBossFireFactor(g);
       if (ring3.fire <= 0 && moduleBossFireFactor(g) > 0) {
-        const count = 14, turn = b.age * 0.18;
+        const count = b.stage === 2 ? 7 : 14, turn = b.age * 0.18;
         for (let i = 0; i < count; i++) bullet2(g, ring3.x, ring3.y, turn + i * Math.PI * 2 / count, 105);
         ring3.fire = 1.3;
         ring3.muzzleUntil = g.time + 0.2;
@@ -1914,7 +1923,7 @@ function stepRiftBoss(g, dt, enemyDt, live, onHit, emit) {
     if (b.fire <= 0 && moduleBossFireFactor(g) > 0) {
       if (gun.hp > 0 && gun.stun <= 0) {
         if (b.stage === 1) fan3(g, gun, target, 5, 0.24);
-        else radial3(g, gun, 10, (b.sideIndex % 2 ? -1 : 1) * b.age * 0.3, 105);
+        else radial3(g, gun, b.stage === 2 ? 7 : 10, (b.sideIndex % 2 ? -1 : 1) * b.age * 0.3, 105);
       }
       b.sideIndex++;
       b.fire = b.stage >= 2 ? 1.2 : 1.35;
@@ -2096,6 +2105,7 @@ function fan4(g, e, p, n = 3, spread = 0.25, split = false) {
 __name(fan4, "fan");
 function ring(g, e, p, n = 12, turn = 0, split = false) {
   const safe = Math.atan2(p.y - e.y, p.x - e.x);
+  if (n === 7) turn = safe + Math.PI / n;
   for (let i = 0; i < n; i++) {
     const a = turn + i * Math.PI * 2 / n;
     if (Math.abs(Math.atan2(Math.sin(a - safe), Math.cos(a - safe))) < 0.32) continue;
@@ -2176,12 +2186,12 @@ function stepFrozenBoss(g, dt, enemyDt, live, onHit, emit) {
       gun.aim = Math.atan2(target.y - gun.y, target.x - gun.x);
     }
     if (b.fire <= 0 && moduleBossFireFactor(g) > 0) {
-      if (gun.hp > 0 && gun.stun <= 0) fan4(g, gun, target, b.stage >= 2 ? 7 : 3, 0.28, false);
+      if (gun.hp > 0 && gun.stun <= 0) fan4(g, gun, target, b.stage === 2 ? 5 : b.stage >= 3 ? 7 : 3, 0.28, false);
       b.sideIndex++;
       b.fire = b.stage >= 2 ? 1.35 : 1.5;
     }
     if (b.crystalFire <= 0 && moduleBossFireFactor(g) > 0 && b.parts[2].hp > 0 && b.parts[2].stun <= 0) {
-      if (b.stage >= 2) ring(g, b, target, 12, b.age * 0.14, true);
+      if (b.stage >= 2) ring(g, b, target, b.stage === 2 ? 7 : 12, b.age * 0.14, true);
       else fan4(g, b, target, 3, 0.55, true);
       b.crystalFire = 5;
     }
@@ -2442,6 +2452,7 @@ function fan5(g, e, p, n = 3, spread = 0.25, split = false) {
 __name(fan5, "fan");
 function ring2(g, e, p, n = 12, turn = 0, split = false) {
   const safe = Math.atan2(p.y - e.y, p.x - e.x);
+  if (n === 7) turn = safe + Math.PI / n;
   for (let i = 0; i < n; i++) {
     const a = turn + i * Math.PI * 2 / n;
     if (Math.abs(Math.atan2(Math.sin(a - safe), Math.cos(a - safe))) < 0.32) continue;
@@ -2547,7 +2558,7 @@ function stepMagmaBoss(g, dt, enemyDt, live, onHit, emit) {
       b.fire = b.stage >= 2 ? 1.35 : 1.5;
     }
     if (b.crystalFire <= 0 && moduleBossFireFactor(g) > 0 && b.parts[2].hp > 0 && b.parts[2].stun <= 0) {
-      if (b.stage >= 2) ring2(g, b, target, 10, b.age * 0.14, true);
+      if (b.stage >= 2) ring2(g, b, target, b.stage === 2 ? 7 : 10, b.age * 0.14, true);
       else fan5(g, b, target, 1, 0.55, true);
       b.crystalFire = 5;
     }
