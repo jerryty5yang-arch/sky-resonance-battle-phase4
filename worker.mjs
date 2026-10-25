@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 54;
+var BACKEND_VERSION = 55;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -1155,6 +1155,38 @@ function pruneSkillVolleys(a, missiles) {
   }
 }
 __name(pruneSkillVolleys, "pruneSkillVolleys");
+
+// ../dist/health-pickups.js
+var HEALTH_PICKUP = { chance: 0.13, hp: 15, energy: 10, lifetime: 10, speed: 75, radius: 30 };
+function dropHealthPickup(g, e) {
+  if (e.type === "boss" || g.random() >= HEALTH_PICKUP.chance) return;
+  g.pickups ??= [];
+  g.pickupId = (g.pickupId || 0) + 1;
+  g.pickups.push({ id: g.pickupId, x: e.x, y: e.y, life: 10, born: g.time });
+}
+__name(dropHealthPickup, "dropHealthPickup");
+function stepHealthPickups(g, dt) {
+  g.pickupFx = (g.pickupFx || []).filter((f) => (f.remaining -= dt) > 0);
+  const pilots = (g.players || [g]).filter((p) => p.hp > 0 && p.connected !== false);
+  for (const item of g.pickups || []) {
+    item.y += 75 * dt;
+    item.life -= dt;
+    if (item.life <= 0 || item.y >= 810) continue;
+    const inRange = pilots.map((p2) => ({ p: p2, pos: g.players ? p2 : g.p })).map((a) => ({ ...a, d: Math.hypot(item.x - a.pos.x, item.y - a.pos.y) })).filter((a) => a.d < 30).sort((a, b) => a.d - b.d || (a.p.slot || 0) - (b.p.slot || 0)), winner = inRange[0];
+    if (!winner) continue;
+    const { p, pos } = winner, before = p.hp, energy = p.energy;
+    p.hp = Math.min(moduleMaxHP(p), p.hp + 15);
+    p.energy = Math.min(moduleMaxEnergy(p), p.energy + 10);
+    item.life = 0;
+    const data = { pickupId: item.id, slot: p.slot || 0, x: item.x, y: item.y, targetX: pos.x, targetY: pos.y, hp: p.hp - before, energy: p.energy - energy };
+    g.pickupFx ??= [];
+    g.pickupFx.push({ ...data, remaining: 1.1, total: 1.1 });
+    if (g.pickupFx.length > 32) g.pickupFx.shift();
+    g.players ? g.event("pickup", data) : g.emit("pickup", data);
+  }
+  g.pickups = (g.pickups || []).filter((p) => p.life > 0 && p.y < 810);
+}
+__name(stepHealthPickups, "stepHealthPickups");
 
 // ../dist/convergence-combo.js
 var alive = /* @__PURE__ */ __name((b, k) => b.parts.find((p) => p.testKind === k && p.hp > 0 && p.stun <= 0), "alive");
@@ -3045,6 +3077,7 @@ function enterEXIntermission(g) {
   g.shots = [];
   g.missiles = [];
   g.pickups = [];
+  g.pickupFx = [];
   g.particles = [];
   g.criticalHits = [];
   g.testWarnings = [];
@@ -3205,6 +3238,8 @@ var CoopCombat = class {
     this.bullets = [];
     this.missiles = [];
     this.events = [];
+    this.pickups = [];
+    this.pickupFx = [];
     this.eventId = 0;
     this.players = players.map((p, i) => ({ id: p.id, name: p.name, aircraft: aircraftRules(p.aircraft).id, slot: i, singer: singerRules(p.singer).id, shield: 0, x: 180 + i * 120, y: 620, hp: 100, energy: 25, score: 0, kills: 0, fire: 0, invuln: 2, missileCd: 0, input: { x: 0, y: 0 }, lastInput: -Infinity, seq: -1, ackSeq: -1, connected: true }));
     this.players.forEach((p, i) => {
@@ -3217,6 +3252,8 @@ var CoopCombat = class {
     return this.time - this.stageStartedAt;
   }
   advanceStage() {
+    this.pickups = [];
+    this.pickupFx = [];
     this.stageIndex = 1;
     this.stageStartedAt = this.time;
     this.mission = "desert";
@@ -3297,6 +3334,7 @@ var CoopCombat = class {
       p.energy = Math.min(moduleMaxEnergy(p), p.energy + 10);
       for (const ally of this.players) if (ally.slot !== p.slot) ally.energy = Math.min(moduleMaxEnergy(ally), ally.energy + 5);
       this.event("explosion", { x: e.x, y: e.y, boss: e.type === "boss", enemyType: e.type });
+      dropHealthPickup(this, e);
       if (e.type === "boss") this.finish(true);
     }
   }
@@ -3343,6 +3381,8 @@ var CoopCombat = class {
       this.state = "transition";
       return;
     }
+    this.pickups = [];
+    this.pickupFx = [];
     this.environmentHazards = [];
     this.eruption = null;
     this.state = "result";
@@ -3552,9 +3592,10 @@ var CoopCombat = class {
     for (const p of this.players) pruneSkillVolleys(p, this.missiles);
     this.bullets = this.bullets.filter((s) => !s.dead && (s.testBullet === "laser" || s.y < 830 && s.y > -60 && s.x > -30 && s.x < 510));
     this.enemies = this.enemies.filter((e) => e.hp > 0 && e.y < 870);
+    if (this.state === "playing") stepHealthPickups(this, dt);
   }
   snapshot() {
-    return { moduleSupport: this.moduleSupport || null, moduleFx: this.moduleFx || [], environmentHazards: this.environmentHazards || [], eruption: this.eruption || null, campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, testWarnings: this.testWarnings || [], supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e, parts: e.parts?.map((p) => ({ ...p })) })), boss: this.boss ? { ...this.boss, parts: this.boss.parts?.map((p) => ({ ...p })) } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
+    return { pickups: (this.pickups || []).map((p) => ({ ...p })), pickupFx: (this.pickupFx || []).map((f) => ({ ...f })), moduleSupport: this.moduleSupport || null, moduleFx: this.moduleFx || [], environmentHazards: this.environmentHazards || [], eruption: this.eruption || null, campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, testWarnings: this.testWarnings || [], supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e, parts: e.parts?.map((p) => ({ ...p })) })), boss: this.boss ? { ...this.boss, parts: this.boss.parts?.map((p) => ({ ...p })) } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
   }
 };
 
@@ -3783,7 +3824,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, healthPickups: true, healthPickupChance: 0.13, healthPickupHP: 15, healthPickupEnergy: 10, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
