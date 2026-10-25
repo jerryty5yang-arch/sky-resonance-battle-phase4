@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 52;
+var BACKEND_VERSION = 54;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -580,13 +580,14 @@ function modulePrimaryHit(g, a, e) {
   if (!active(g) || !ready(a, "primary")) return;
   const element = use(a, "primary"), pos = { x: e.x, y: e.y };
   if (element === "thunder") {
+    fx(g, a, "burst", pos, 24, 0.5, element);
     const es = targets(g).filter((t) => t !== e && moduleVisible(a, t)), seen = /* @__PURE__ */ new Set([e]);
     let p = e;
     hit(g, a, e, 35);
     for (let i = 0; i < 2; i++) {
       const next = nearest(es.filter((t) => t.hp > 0 && !seen.has(t)), p);
       if (!next) break;
-      fx(g, a, "link", { x: p.x, y: p.y }, 0, 0.3, element);
+      fx(g, a, "link", { x: p.x, y: p.y }, 0, 0.45, element);
       Object.assign(g.moduleFx.at(-1), { x1: next.x, y1: next.y });
       hit(g, a, next, 35);
       seen.add(next);
@@ -703,7 +704,10 @@ function moduleSupportStart(g, a) {
   if (!ready(a, "singer")) return 6;
   const element = use(a, "singer");
   g.moduleSupport = { element, elapsed: 0, owner: a.slot || 0 };
-  if (element === "earth") g.bullets = [];
+  if (element === "earth") {
+    g.bullets = [];
+    fx(g, a, "clear", modulePos(g, a), 450, 0.8, "earth");
+  }
   if (element === "thunder" && g.supportSinger === "kaname") {
     for (const other of moduleActors(g)) if (other !== a && other.hp > 0 && other.connected !== false) other.hp = Math.min(moduleMaxHP(other), other.hp + 20);
   }
@@ -714,7 +718,10 @@ function moduleSupportEnd(g) {
   const s = g.moduleSupport;
   if (!s) return;
   const a = moduleActors(g).find((p) => (p.slot || 0) === s.owner);
-  if (s.element === "earth") g.bullets = [];
+  if (s.element === "earth") {
+    g.bullets = [];
+    if (a) fx(g, a, "clear", modulePos(g, a), 450, 0.8, "earth");
+  }
   if (s.element === "fire" && a) {
     for (const e of targets(g)) hit(g, a, e, 500);
     fx(g, a, "finale", g.players ? a : g.p, 450, 1, "fire");
