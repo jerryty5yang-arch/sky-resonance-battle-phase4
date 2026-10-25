@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 55;
+var BACKEND_VERSION = 56;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -588,7 +588,7 @@ function modulePrimaryHit(g, a, e) {
       const next = nearest(es.filter((t) => t.hp > 0 && !seen.has(t)), p);
       if (!next) break;
       fx(g, a, "link", { x: p.x, y: p.y }, 0, 0.45, element);
-      Object.assign(g.moduleFx.at(-1), { x1: next.x, y1: next.y });
+      Object.assign(g.moduleFx.at(-1), { x1: next.x, y1: next.y, chain: i + 1, source: "primary" });
       hit(g, a, next, 35);
       seen.add(next);
       p = next;
@@ -643,7 +643,11 @@ function moduleWeaponStart(g, a, pos) {
       a.moduleCycleScale = 0;
     }
   }
-  if (element === "fire") radial(g, a, { x: pos.x, y: pos.y - 100 }, 120, 150, element);
+  if (element === "fire") {
+    const p = { x: pos.x, y: pos.y - 100 };
+    fx(g, a, "reticle", p, 24, 0.35, element);
+    radial(g, a, p, 120, 150, element);
+  }
 }
 __name(moduleWeaponStart, "moduleWeaponStart");
 function moduleShield(a) {
@@ -723,7 +727,9 @@ function moduleSupportEnd(g) {
     if (a) fx(g, a, "clear", modulePos(g, a), 450, 0.8, "earth");
   }
   if (s.element === "fire" && a) {
-    for (const e of targets(g)) hit(g, a, e, 500);
+    const victims = targets(g);
+    for (const e of victims.slice(0, 20)) fx(g, a, "finaleHit", e, e.r || 20, 0.65, "fire");
+    for (const e of victims) hit(g, a, e, 500);
     fx(g, a, "finale", g.players ? a : g.p, 450, 1, "fire");
   }
   if (s.element === "thunder" && g.supportSinger === "freyja" && g.players) {
@@ -757,13 +763,14 @@ function tickModules(g, dt) {
       while (z.tick <= 1e-8 && z.count < 4) {
         z.tick += 0.5;
         z.count++;
+        fx(g, a, "zonePulse", z, 60, 0.22, "time");
         for (const e of targets(g)) if (Math.hypot(e.x - z.x, e.y - z.y) <= 60 + (e.r || 0)) hit(g, a, e, 15);
       }
     }
     state.zones = (state.zones || []).filter((z) => z.count < 4);
     const p = modulePos(g, a);
     if (state.iceCircle > 0) {
-      for (const b of g.bullets) if (Math.hypot(b.x - p.x, b.y - p.y) <= 70 + (b.r || 0)) b.dead = true;
+      for (const b of g.bullets) if (Math.hypot(b.x - p.x, b.y - p.y) <= 70 + (b.r || 0)) iceShatter(g, a, b);
     }
     if (state.pulses) {
       state.pulses.tick -= dt;
@@ -810,6 +817,7 @@ function moduleMoved(g, a, before, normal, dt) {
         const t = { x: last.x + (p.x - last.x) * i * 12 / distance, y: last.y + (p.y - last.y) * i * 12 / distance, element: state.trailElement, remaining: state.trailElement === "ice" ? 4 : 2 };
         state.trails.push(t);
         fx(g, a, "trail", t, 15, t.remaining, t.element);
+        Object.assign(g.moduleFx.at(-1), { x0: last.x + (p.x - last.x) * (i - 1) * 12 / distance, y0: last.y + (p.y - last.y) * (i - 1) * 12 / distance });
         state.trailLast = { x: t.x, y: t.y };
       }
       if (state.trails.length > 240) state.trails.splice(0, state.trails.length - 240);
@@ -822,10 +830,30 @@ function moduleBulletDefense(g) {
   for (const a of moduleActors(g)) {
     if (a.hp <= 0 || a.connected === false || !(a.moduleState?.iceCircle > 0)) continue;
     const p = modulePos(g, a);
-    for (const b of g.bullets) if (Math.hypot(b.x - p.x, b.y - p.y) <= 70 + (b.r || 0)) b.dead = true;
+    for (const b of g.bullets) if (Math.hypot(b.x - p.x, b.y - p.y) <= 70 + (b.r || 0)) iceShatter(g, a, b);
   }
 }
 __name(moduleBulletDefense, "moduleBulletDefense");
+function iceShatter(g, a, b) {
+  if (b.dead) return;
+  if (g.iceFxFrame !== g.time) {
+    g.iceFxFrame = g.time;
+    g.iceFxCount = 0;
+  }
+  if ((g.iceFxCount || 0) < 8) {
+    fx(g, a, "iceShatter", b, 12, 0.4, "ice");
+    g.iceFxCount = (g.iceFxCount || 0) + 1;
+  }
+  b.dead = true;
+}
+__name(iceShatter, "iceShatter");
+function moduleShieldImpact(g, a, impact) {
+  if (!active(g) || !moduleShield(a)) return;
+  const p = modulePos(g, a), dx = (impact?.x ?? p.x) - p.x, dy = (impact?.y ?? p.y - 1) - p.y, n = Math.hypot(dx, dy) || 1;
+  fx(g, a, "shieldImpact", p, 48, 0.45, "earth");
+  Object.assign(g.moduleFx.at(-1), { x1: p.x + dx / n * 48, y1: p.y + dy / n * 48 });
+}
+__name(moduleShieldImpact, "moduleShieldImpact");
 
 // ../dist/missile-targeting.js
 function nearestEnemy(targets2, origin) {
@@ -3350,11 +3378,12 @@ var CoopCombat = class {
     this.damage(e, damage, owner);
     return damage;
   }
-  hit(p, source2 = "bullet") {
+  hit(p, source2 = "bullet", impact = null) {
     if (this.state !== "playing" || p.hp <= 0 || p.invuln > 0) return;
     const incoming = skillIncomingDamage(p, 20, source2);
     if (incoming === 0) return;
     if (this.res > 0 && p.shield > 0 || skillShieldAvailable(p) || moduleShield(p)) {
+      moduleShieldImpact(this, p, impact);
       if (this.campaign === "survivalex") consumeModuleShields(p);
       else if (this.res > 0 && p.shield > 0) p.shield--;
       else p.dashShield = 0;
@@ -3579,7 +3608,7 @@ var CoopCombat = class {
       s.x += s.vx * bulletStep;
       s.y += s.vy * bulletStep;
       for (const p of live) if (enemyBulletHits(s, p)) {
-        this.hit(p);
+        this.hit(p, "bullet", s);
         if (s.testBullet !== "laser") {
           s.y = 900;
           break;
@@ -3824,7 +3853,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, healthPickups: true, healthPickupChance: 0.13, healthPickupHP: 15, healthPickupEnergy: 10, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, healthPickups: true, elementalFeedback: true, healthPickupChance: 0.13, healthPickupHP: 15, healthPickupEnergy: 10, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
