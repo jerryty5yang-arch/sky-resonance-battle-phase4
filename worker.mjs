@@ -42,7 +42,7 @@ async function releaseRoom(store, matchId, now) {
 __name(releaseRoom, "releaseRoom");
 
 // src/diagnostics.mjs
-var BACKEND_VERSION = 56;
+var BACKEND_VERSION = 57;
 var hints = /* @__PURE__ */ new Set(["wnam", "enam", "sam", "weur", "eeur", "apac", "apac-ne", "apac-se", "oc", "afr", "me"]);
 var roomLocationHint = /* @__PURE__ */ __name((env) => hints.has(env.ROOM_LOCATION_HINT) ? env.ROOM_LOCATION_HINT : "apac-ne", "roomLocationHint");
 function edgeDiagnostic(request, env) {
@@ -1184,6 +1184,120 @@ function pruneSkillVolleys(a, missiles) {
 }
 __name(pruneSkillVolleys, "pruneSkillVolleys");
 
+// ../dist/weapon-growth.js
+var WEAPON_DROP_RULES = Object.freeze({ powerNormal: 0.04, powerElite: 0.1, powerPity: 25, chipNormal: 0.02, chipElite: 0.05, maxLevel: 6 });
+var clampLevel = /* @__PURE__ */ __name((n) => Math.max(1, Math.min(6, Math.trunc(Number(n) || 1))), "clampLevel");
+var weaponLevel = /* @__PURE__ */ __name((a) => clampLevel(a?.firepowerLevel), "weaponLevel");
+function initWeaponGrowth(g, a) {
+  if (g.campaign !== "survivalex") return;
+  a.firepowerLevel = 1;
+  a.barrageChip = null;
+  a.powerCoreStage = g.stageIndex || 0;
+  a.powerCoreClaimed = false;
+  a.powerCorePity = 0;
+  a.powerCoreAward = null;
+}
+__name(initWeaponGrowth, "initWeaponGrowth");
+function stageState(g, a) {
+  if (a.powerCoreStage !== g.stageIndex) {
+    a.powerCoreStage = g.stageIndex;
+    a.powerCoreClaimed = false;
+    a.powerCorePity = 0;
+    a.powerCoreAward = null;
+  }
+}
+__name(stageState, "stageState");
+function item(g, data) {
+  g.pickups ??= [];
+  g.pickupId = (g.pickupId || 0) + 1;
+  g.pickups.push({ id: g.pickupId, life: 10, born: g.time, ...data });
+}
+__name(item, "item");
+function upgradePower(g, a, source2 = "drop") {
+  stageState(g, a);
+  if (weaponLevel(a) >= 6 || a.powerCoreClaimed) return false;
+  a.firepowerLevel = weaponLevel(a) + 1;
+  a.powerCoreClaimed = true;
+  a.powerCorePity = 0;
+  a.powerCoreAward = { stage: g.stageIndex, level: a.firepowerLevel, source: source2 };
+  return true;
+}
+__name(upgradePower, "upgradePower");
+function awardBossPower(g) {
+  if (g.campaign !== "survivalex" || g.stageIndex >= 5) return;
+  for (const a of g.players || [g]) upgradePower(g, a, "boss");
+}
+__name(awardBossPower, "awardBossPower");
+function dropWeaponLoot(g, e) {
+  if (g.campaign !== "survivalex" || e.type === "boss" || g.boss?.parts?.includes(e) || g.state !== "playing") return;
+  const elite = e.type === "elite";
+  for (const a of g.players || [g]) {
+    if (a.hp <= 0 || a.connected === false) continue;
+    stageState(g, a);
+    const owner = a.slot || 0, pending = (g.pickups || []).some((p) => p.kind === "power" && p.owner === owner && p.stage === g.stageIndex && p.life > 0);
+    if (weaponLevel(a) < 6 && !a.powerCoreClaimed) {
+      a.powerCorePity++;
+      if (!pending && (a.powerCorePity > 25 || g.random() < (elite ? 0.1 : 0.04))) item(g, { kind: "power", owner, stage: g.stageIndex, x: e.x + (g.players ? owner ? 10 : -10 : 0), y: e.y });
+    }
+    if (!(g.pickups || []).some((p) => p.kind === "chip" && p.owner === owner && p.life > 0) && g.random() < (elite ? 0.05 : 0.02)) {
+      const chip = a.barrageChip === "focus" ? "spread" : a.barrageChip === "spread" ? "focus" : g.random() < 0.5 ? "focus" : "spread";
+      item(g, { kind: "chip", chip, owner, stage: g.stageIndex, x: e.x + (g.players ? owner ? 10 : -10 : 0), y: e.y - 10 });
+    }
+  }
+}
+__name(dropWeaponLoot, "dropWeaponLoot");
+function canCollectWeaponItem(g, a, p) {
+  if (g.campaign !== "survivalex" || p.owner !== (a.slot || 0) || p.stage !== g.stageIndex) return false;
+  stageState(g, a);
+  return p.kind === "power" ? weaponLevel(a) < 6 && !a.powerCoreClaimed : p.kind === "chip" && ["focus", "spread"].includes(p.chip) && p.chip !== a.barrageChip;
+}
+__name(canCollectWeaponItem, "canCollectWeaponItem");
+function collectWeaponItem(g, a, p) {
+  if (!canCollectWeaponItem(g, a, p)) return false;
+  if (p.kind === "power") return upgradePower(g, a);
+  a.barrageChip = p.chip;
+  return true;
+}
+__name(collectWeaponItem, "collectWeaponItem");
+function growthWeapon(id, actor) {
+  const level = weaponLevel(actor), i = level - 1;
+  let interval, damage, offsets, angles;
+  if (id === "swift") {
+    interval = [0.1, 0.1 / 1.1, 0.1 / 1.2, 0.1 / 1.2, 0.08, 0.08][i];
+    damage = level < 4 ? [4, 4] : [4, level === 4 ? 2 / 3 : level === 5 ? 0.96 : 1.6, 4];
+    offsets = level < 4 ? [-4, 4] : [-4, 0, 4];
+    angles = offsets.map(() => 0);
+  } else if (id === "heavy") {
+    interval = 0.18;
+    const middle = [6, 7.8, 9.6, 9.6, 10.2, 10.8][i];
+    damage = level < 4 ? [6, middle, 6] : [level === 4 ? 0.9 : level === 5 ? 1.5 : 2.1, 6, middle, 6, level === 4 ? 0.9 : level === 5 ? 1.5 : 2.1];
+    offsets = level < 4 ? [-12, 0, 12] : [-20, -12, 0, 12, 20];
+    angles = level < 4 ? [-0.18, 0, 0.18] : [-0.24, -0.18, 0, 0.18, 0.24];
+  } else {
+    interval = 0.12;
+    damage = level < 3 ? [5 + (level === 2 ? 0.5 : 0), 5 + (level === 2 ? 0.5 : 0)] : level < 5 ? [5.5, level === 3 ? 1 : 2, 5.5] : [level === 5 ? 0.5 : 1, 5.5, 2, 5.5, level === 5 ? 0.5 : 1];
+    offsets = level < 3 ? [-10, 10] : level < 5 ? [-10, 0, 10] : [-24, -10, 0, 10, 24];
+    angles = offsets.map(() => 0);
+  }
+  const chip = actor?.barrageChip;
+  if (chip === "focus") {
+    offsets = offsets.map((n) => n * 0.65);
+    angles = angles.map((n) => n * (id === "heavy" ? 0.65 : 0.6));
+  }
+  if (chip === "spread") {
+    const spread = id === "swift" ? 0.07 : id === "heavy" ? 0.045 : 0.1;
+    angles = angles.map((n, k) => n + (k - (angles.length - 1) / 2) * spread);
+    offsets = offsets.map((n) => n * 1.12);
+  }
+  return { level, interval, damage, offsets, angles };
+}
+__name(growthWeapon, "growthWeapon");
+function growthShots(id, x, y, actor) {
+  const r = growthWeapon(id, actor);
+  return r.angles.map((a, i) => ({ x: x + r.offsets[i], y: y - 28, vx: Math.sin(a) * 650, vy: -Math.cos(a) * 650, r: 3, damage: r.damage[i], weaponLevel: r.level, chip: actor?.barrageChip || null, secondary: r.damage[i] < Math.max(...r.damage) * 0.45 }));
+}
+__name(growthShots, "growthShots");
+
 // ../dist/health-pickups.js
 var HEALTH_PICKUP = { chance: 0.13, hp: 15, energy: 10, lifetime: 10, speed: 75, radius: 30 };
 function dropHealthPickup(g, e) {
@@ -1194,19 +1308,30 @@ function dropHealthPickup(g, e) {
 }
 __name(dropHealthPickup, "dropHealthPickup");
 function stepHealthPickups(g, dt) {
+  g.weaponPickupFx = (g.weaponPickupFx || []).filter((f) => (f.remaining -= dt) > 0);
   g.pickupFx = (g.pickupFx || []).filter((f) => (f.remaining -= dt) > 0);
   const pilots = (g.players || [g]).filter((p) => p.hp > 0 && p.connected !== false);
-  for (const item of g.pickups || []) {
-    item.y += 75 * dt;
-    item.life -= dt;
-    if (item.life <= 0 || item.y >= 810) continue;
-    const inRange = pilots.map((p2) => ({ p: p2, pos: g.players ? p2 : g.p })).map((a) => ({ ...a, d: Math.hypot(item.x - a.pos.x, item.y - a.pos.y) })).filter((a) => a.d < 30).sort((a, b) => a.d - b.d || (a.p.slot || 0) - (b.p.slot || 0)), winner = inRange[0];
+  for (const item2 of g.pickups || []) {
+    item2.y += 75 * dt;
+    item2.life -= dt;
+    if (item2.life <= 0 || item2.y >= 810) continue;
+    const inRange = pilots.map((p2) => ({ p: p2, pos: g.players ? p2 : g.p })).map((a) => ({ ...a, d: Math.hypot(item2.x - a.pos.x, item2.y - a.pos.y) })).filter((a) => a.d < 30 && (!item2.kind || item2.kind === "health" || canCollectWeaponItem(g, a.p, item2))).sort((a, b) => a.d - b.d || (a.p.slot || 0) - (b.p.slot || 0)), winner = inRange[0];
     if (!winner) continue;
     const { p, pos } = winner, before = p.hp, energy = p.energy;
+    if (item2.kind && item2.kind !== "health") {
+      if (!collectWeaponItem(g, p, item2)) continue;
+      item2.life = 0;
+      const data2 = { pickupId: item2.id, slot: p.slot || 0, x: item2.x, y: item2.y, targetX: pos.x, targetY: pos.y, kind: item2.kind, chip: item2.chip || null, level: p.firepowerLevel };
+      g.weaponPickupFx ??= [];
+      g.weaponPickupFx.push({ ...data2, remaining: 1, total: 1 });
+      if (g.weaponPickupFx.length > 16) g.weaponPickupFx.shift();
+      g.players ? g.event("weaponPickup", data2) : g.emit("weaponPickup", data2);
+      continue;
+    }
     p.hp = Math.min(moduleMaxHP(p), p.hp + 15);
     p.energy = Math.min(moduleMaxEnergy(p), p.energy + 10);
-    item.life = 0;
-    const data = { pickupId: item.id, slot: p.slot || 0, x: item.x, y: item.y, targetX: pos.x, targetY: pos.y, hp: p.hp - before, energy: p.energy - energy };
+    item2.life = 0;
+    const data = { pickupId: item2.id, slot: p.slot || 0, x: item2.x, y: item2.y, targetX: pos.x, targetY: pos.y, hp: p.hp - before, energy: p.energy - energy };
     g.pickupFx ??= [];
     g.pickupFx.push({ ...data, remaining: 1.1, total: 1.1 });
     if (g.pickupFx.length > 32) g.pickupFx.shift();
@@ -3090,6 +3215,7 @@ var SupportDamage = class {
 
 // ../dist/ex-route.js
 function enterEXIntermission(g) {
+  awardBossPower(g);
   g.moduleSupport = null;
   g.moduleFx = [];
   g.environmentHazards = [];
@@ -3106,6 +3232,7 @@ function enterEXIntermission(g) {
   g.missiles = [];
   g.pickups = [];
   g.pickupFx = [];
+  g.weaponPickupFx = [];
   g.particles = [];
   g.criticalHits = [];
   g.testWarnings = [];
@@ -3268,10 +3395,12 @@ var CoopCombat = class {
     this.events = [];
     this.pickups = [];
     this.pickupFx = [];
+    this.weaponPickupFx = [];
     this.eventId = 0;
     this.players = players.map((p, i) => ({ id: p.id, name: p.name, aircraft: aircraftRules(p.aircraft).id, slot: i, singer: singerRules(p.singer).id, shield: 0, x: 180 + i * 120, y: 620, hp: 100, energy: 25, score: 0, kills: 0, fire: 0, invuln: 2, missileCd: 0, input: { x: 0, y: 0 }, lastInput: -Infinity, seq: -1, ackSeq: -1, connected: true }));
     this.players.forEach((p, i) => {
       initModules(p, this.campaign);
+      initWeaponGrowth(this, p);
       configureSkills(p, this.campaign, players[i].build);
       Object.defineProperty(p, "moduleOnWeapon", { value: /* @__PURE__ */ __name((pos) => moduleWeaponStart(this, p, pos), "value") });
     });
@@ -3282,6 +3411,7 @@ var CoopCombat = class {
   advanceStage() {
     this.pickups = [];
     this.pickupFx = [];
+    this.weaponPickupFx = [];
     this.stageIndex = 1;
     this.stageStartedAt = this.time;
     this.mission = "desert";
@@ -3363,6 +3493,7 @@ var CoopCombat = class {
       for (const ally of this.players) if (ally.slot !== p.slot) ally.energy = Math.min(moduleMaxEnergy(ally), ally.energy + 5);
       this.event("explosion", { x: e.x, y: e.y, boss: e.type === "boss", enemyType: e.type });
       dropHealthPickup(this, e);
+      dropWeaponLoot(this, e);
       if (e.type === "boss") this.finish(true);
     }
   }
@@ -3412,6 +3543,7 @@ var CoopCombat = class {
     }
     this.pickups = [];
     this.pickupFx = [];
+    this.weaponPickupFx = [];
     this.environmentHazards = [];
     this.eruption = null;
     this.state = "result";
@@ -3505,8 +3637,8 @@ var CoopCombat = class {
       p.ackSeq = p.seq;
       p.fire -= dt;
       if (p.fire <= 0) {
-        p.fire += aircraftRules(p.aircraft).interval / (active2 ? rules.fire : 1);
-        for (const shot2 of aircraftShots(p.aircraft, p.x, p.y)) this.shots.push({ id: this.nextId++, owner: p.slot, ...shot2, damage: shot2.damage * (p.modules?.primary ? 1.15 : 1) });
+        p.fire += (this.campaign === "survivalex" ? growthWeapon(p.aircraft, p).interval : aircraftRules(p.aircraft).interval) / (active2 ? rules.fire : 1);
+        for (const shot2 of this.campaign === "survivalex" ? growthShots(p.aircraft, p.x, p.y, p) : aircraftShots(p.aircraft, p.x, p.y)) this.shots.push({ id: this.nextId++, owner: p.slot, ...shot2, damage: shot2.damage * (p.modules?.primary ? 1.15 : 1) });
       }
     }
     if (this.mission === "convergenceex") stepConvergenceEX(this, dt, enemyStep, this.players, (p, source2) => this.hit(p, source2), (type) => this.event(type));
@@ -3624,7 +3756,7 @@ var CoopCombat = class {
     if (this.state === "playing") stepHealthPickups(this, dt);
   }
   snapshot() {
-    return { pickups: (this.pickups || []).map((p) => ({ ...p })), pickupFx: (this.pickupFx || []).map((f) => ({ ...f })), moduleSupport: this.moduleSupport || null, moduleFx: this.moduleFx || [], environmentHazards: this.environmentHazards || [], eruption: this.eruption || null, campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, testWarnings: this.testWarnings || [], supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e, parts: e.parts?.map((p) => ({ ...p })) })), boss: this.boss ? { ...this.boss, parts: this.boss.parts?.map((p) => ({ ...p })) } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
+    return { weaponPickupFx: (this.weaponPickupFx || []).map((f) => ({ ...f })), pickups: (this.pickups || []).map((p) => ({ ...p })), pickupFx: (this.pickupFx || []).map((f) => ({ ...f })), moduleSupport: this.moduleSupport || null, moduleFx: this.moduleFx || [], environmentHazards: this.environmentHazards || [], eruption: this.eruption || null, campaign: this.campaign, stageIndex: this.stageIndex, stageTime: this.stageTime, criticalHits: this.criticalHits || [], mission: this.mission, testWarnings: this.testWarnings || [], supportSinger: this.supportSinger || "freyja", supportSlot: this.supportSlot, tick: this.tick, time: this.time, state: this.state, win: this.win, score: this.score, phase: this.phase, res: this.res, intro: this.intro, burst: this.burst, players: this.players.map(({ input, lastInput, skillHits, ...p }) => ({ ...p, weaponFx: skillFxSnapshot(p), skill: p.skill ? { ...p.skill } : null })), enemies: this.enemies.map((e) => ({ ...e, parts: e.parts?.map((p) => ({ ...p })) })), boss: this.boss ? { ...this.boss, parts: this.boss.parts?.map((p) => ({ ...p })) } : null, shots: this.shots.map((e) => ({ ...e })), bullets: this.bullets.map((e) => ({ ...e })), missiles: this.missiles.map(({ target, ...e }) => ({ ...e })), events: this.events.map((e) => ({ ...e })) };
   }
 };
 
@@ -3768,10 +3900,10 @@ function networkSnapshot(snapshot) {
   const w = snapshot.world;
   return { ...snapshot, world: {
     ...w,
-    players: w.players.map((p) => ({ ...pick(p, ["id", "name", "slot", "aircraft", "singer", "x", "y", "hp", "energy", "score", "kills", "invuln", "missileCd", "seq", "ackSeq", "connected", "maxHp", "maxEnergy", "modules", "moduleState", "moduleReward", "moduleRewardConfirmed", "shield", "shieldHitUntil", "skill", "skillCampaign", "skillBuild", "weaponFx", "weaponCharges", "weaponGap", "dashShield", "bulletImmune", "speedBoost"]), moduleState: p.moduleState ? pick(p.moduleState, ["shield", "boost", "iceCircle"]) : void 0 })),
+    players: w.players.map((p) => ({ ...pick(p, ["id", "name", "slot", "aircraft", "singer", "x", "y", "hp", "energy", "score", "kills", "invuln", "missileCd", "seq", "ackSeq", "connected", "maxHp", "maxEnergy", "modules", "moduleState", "moduleReward", "moduleRewardConfirmed", "shield", "shieldHitUntil", "skill", "skillCampaign", "skillBuild", "weaponFx", "weaponCharges", "firepowerLevel", "barrageChip", "powerCoreAward", "weaponGap", "dashShield", "bulletImmune", "speedBoost"]), moduleState: p.moduleState ? pick(p.moduleState, ["shield", "boost", "iceCircle"]) : void 0 })),
     enemies: w.enemies.map((e) => ({ ...pick(e, ["id", "type", "testKind", "testProtected", "maxHp", "x", "y", "hp", "r", "age", "seed", "stun", "vx", "vy", "dashPhase", "charge", "muzzleUntil", "hitUntil", "testHaste", "laserWarning", "phased", "phaseWarning", "exit", "dashAngle", "links", "weakUntil", "arrivalSafe", "entrySafe", "moduleFreeze", "moduleSlows"]), parts: e.parts?.map((p) => pick(p, ["id", "type", "testKind", "side", "x", "y", "hp", "maxHp", "r", "age", "aim", "stun", "hitUntil", "muzzleUntil"])) })),
     boss: w.boss ? { ...pick(w.boss, ["id", "type", "testKind", "name", "x", "y", "hp", "maxHp", "r", "age", "fire", "stun", "stage", "partsUnlocked", "combo", "coreSpecial", "attack", "realms", "cycleIndex", "judgmentIndex", "warning", "attackTime", "weakTime", "warning", "hitUntil", "openSoon"]), parts: (w.boss.parts || []).map((p) => pick(p, ["id", "type", "testKind", "side", "x", "y", "hp", "maxHp", "r", "age", "stun", "aim", "muzzleUntil", "hitUntil", "destroyedAt", "charge"])) } : null,
-    shots: w.shots.map((s) => pick(s, ["id", "owner", "x", "y", "vx", "vy", "critical", "super"])),
+    shots: w.shots.map((s) => pick(s, ["id", "owner", "x", "y", "vx", "vy", "critical", "super", "weaponLevel", "chip", "secondary"])),
     bullets: w.bullets.map((s) => pick(s, ["id", "x", "y", "vx", "vy", "r", "testBullet", "beamId", "angle", "width", "tone", "sourceId", "splitIn", "splitAngle", "splitWarning", "convergenceIce"])),
     missiles: w.missiles.map((m) => pick(m, ["id", "owner", "x", "y", "vx", "vy", "life", "age", "super"]))
   } };
@@ -3853,7 +3985,7 @@ var rosterValid = /* @__PURE__ */ __name((players) => Array.isArray(players) && 
 var worker_default = { async fetch(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/network-check" && request.method === "GET") return edgeDiagnostic(request, env);
-  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, healthPickups: true, elementalFeedback: true, healthPickupChance: 0.13, healthPickupHP: 15, healthPickupEnergy: 10, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
+  if (url.pathname === "/health") return response({ service: "sky-resonance-battle", version: BACKEND_VERSION, combatLayoutV2: true, healthPickups: true, weaponGrowth: true, firepowerLevels: 6, powerCoreNormalChance: 0.04, powerCoreEliteChance: 0.1, barrageChipNormalChance: 0.02, barrageChipEliteChance: 0.05, elementalFeedback: true, healthPickupChance: 0.13, healthPickupHP: 15, healthPickupEnergy: 10, killEnergy: 10, teammateKillEnergy: 5, mineRays: 12, heavyFirepower2Damage: 250, chargeDamageReduction: 0.5, interceptorHp: 48, interceptorSpeed: 175, enemyArtAlignment: true, expandedFlightSpace: true, flightBounds: FLIGHT_BOUNDS, mission01Test: true, mission01Multipart: true, mission02Test: true, survivalEX: true, survivalModules: true, moduleSkillCount: 25, mission03EX: true, mission04EX: true, mission05EX: true, mission06EX: true, environmentHazards: true, eruptionPeriod: 15, survivalEXStages: 6, testRetreatAt: 140, testBossAt: 150, lobbyConnectionTest: true, lobbyLoadoutLock: true, survivalSkills: true, fullSkillAllocationRequired: true, transportDiagnostics: true, roomQuotaRelease: true, admissionLimits: ADMISSION_LIMITS, normalMissileLifetime: 3.5, normalMissileTargeting: "nearest-until-death", chainHuntDamageMultiplier: 0.5, swiftImpactRadius: 100, swiftShockRadius: 150, supportMissileLifetime: 4.5, releasePhase: 7, phase7Baseline: true, specialWeapons: true, desertMission: true, aircraftSelection: true, phase6: true, singers: true, supportShieldsBySinger: { freyja: 0, kaname: 1, mikumo: 0 }, supportHealBySinger: { freyja: 0, kaname: 20, mikumo: 0 }, critChance: 0.15, critMultiplier: 2, critRoll: "per-hit", enemyMoveMultiplier: 0.4, supportEffects: true, survivalRoute: true, networkOptimized: true, reviewFixes: true, snapshotHz: 20, roomLocationHint: roomLocationHint(env), supportDamageRule: "per-target-per-volley", supportDamageFirst: 40, supportDamageStep: 4, supportDamageMin: 20, supportBurstOwner: "caster", supportMissilesPerCast: 16, resultsReady: true, roomAuth: env.SITE_PUBLIC_KEY ? "ECDSA-P256" : "HMAC" });
   if (!env.BATTLE_SECRET || !env.SITE_ORIGIN) return response({ error: "Service is not configured" }, 503);
   if (url.pathname.startsWith("/probe/") && request.headers.get("Upgrade")?.toLowerCase() === "websocket") {
     if (request.headers.get("Origin") !== env.SITE_ORIGIN) return response({ error: "Origin denied" }, 403);
